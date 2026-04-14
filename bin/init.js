@@ -223,16 +223,24 @@ async function bindAgent() {
 
     if (res.status !== 200 && res.status !== 201) {
       const msg =
-        res.data?.message || res.data?.error || JSON.stringify(res.data);
-      console.error(`\n  ${c.red}✗ Binding failed: ${msg}${c.reset}\n`);
+        res.data?.msg || res.data?.message || res.data?.error || JSON.stringify(res.data);
+      console.error(`\n  ${c.red}✗ Binding failed (HTTP ${res.status}): ${msg}${c.reset}\n`);
       process.exit(1);
     }
 
-    const apiKey = res.data?.data?.api_key || res.data?.api_key;
-    const sandboxBaseUrl =
-      res.data?.data?.sandbox_base_url ||
-      res.data?.sandbox_base_url ||
-      `${BENCHMARK_API_BASE}/agent`;
+    // Server returns { code, msg, data } — check business error
+    const body = res.data || {};
+    if (typeof body.code === "number" && body.code !== 0) {
+      console.error(
+        `\n  ${c.red}✗ Binding failed: ${body.msg || "Unknown error"} (code ${body.code})${c.reset}\n`
+      );
+      process.exit(1);
+    }
+
+    const payload = body.data || body;
+    const apiKey = payload.api_key;
+    const sandboxBaseUrl = payload.sandbox_base_url || `${BENCHMARK_API_BASE}/agent`;
+    const sessionId = payload.binding_id || payload.session_id || "";
 
     if (!apiKey) {
       console.error(
@@ -250,6 +258,7 @@ async function bindAgent() {
       `BENCHMARK_API_KEY=${apiKey}`,
       `BENCHMARK_API_BASE=${sandboxBaseUrl}`,
       `BENCHMARK_SERVER_BASE=${BENCHMARK_API_BASE}`,
+      `BENCHMARK_SESSION_ID=${sessionId}`,
       "",
     ].join("\n");
 

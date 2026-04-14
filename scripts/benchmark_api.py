@@ -4,6 +4,7 @@ Manic Trading Benchmark — Sandbox API Client
 Provides HTTP wrappers for all benchmark-server endpoints:
   - Task orchestration (next / submit)
   - Sandbox trading (prices, account, positions)
+  - Result polling (via public share endpoint)
 """
 
 import os
@@ -21,6 +22,7 @@ load_dotenv(_env_path)
 BENCHMARK_API_KEY = os.getenv("BENCHMARK_API_KEY", "")
 BENCHMARK_API_BASE = os.getenv("BENCHMARK_API_BASE", "https://benchmark-api.manic.trade/agent")
 BENCHMARK_SERVER_BASE = os.getenv("BENCHMARK_SERVER_BASE", "https://benchmark-api.manic.trade")
+BENCHMARK_SESSION_ID = os.getenv("BENCHMARK_SESSION_ID", "")
 
 TASK_BASE = f"{BENCHMARK_SERVER_BASE}/benchmark"
 
@@ -170,33 +172,96 @@ def get_position_history():
     return _request("GET", f"{BENCHMARK_API_BASE}/position-history")
 
 
-# ─── Scoring Poll ────────────────────────────────────────────────────────────
+# ─── Result Polling ──────────────────────────────────────────────────────────
 
-def poll_score(timeout=120, interval=3):
-    """Poll task/next until scoring is complete.
+def get_share_result(session_id=None):
+    """GET /benchmark/share/:sessionId — Public endpoint, no auth needed.
 
-    After all tasks are submitted, the session enters 'scoring' state.
-    Keep polling until the server returns the final results.
+    Returns scoring data for a completed session.
     """
+    sid = session_id or BENCHMARK_SESSION_ID
+    if not sid:
+        raise ApiError(code=-1, msg="No session ID available for result polling")
+    return _request(
+        "GET",
+        f"{TASK_BASE}/share/{sid}",
+        headers={"Content-Type": "application/json"},
+    )
+
+
+def _try_extract_session_id():
+    """Try to discover session_id via the account endpoint.
+
+    The account response may contain session metadata we can use.
+    Falls back to None if not available.
+    """
+    try:
+        result = _request("GET", f"{BENCHMARK_API_BASE}/account")
+        data = result.get("data", result) if isinstance(result, dict) else {}
+        if isinstance(data, dict):
+            return data.get("sessionId", data.get("session_id"))
+    except (ApiError, Exception):
+        pass
+    return None
+
+
+def poll_result(session_id=None, timeout=120, interval=3):
+    """Poll for scoring results after all tasks are submitted.
+
+    Strategy:
+    1. Try the public share endpoint if session ID is available
+    2. Use task/next as a status probe (works during 'scoring' state)
+    3. When 401 indicates scoring is done, try share endpoint
+    4. If no session ID at all, wait for scoring then report timeout
+       with guidance to check the web UI
+    """
+    sid = session_id or BENCHMARK_SESSION_ID
     start = time.time()
+    scoring_detected = False
+
     while time.time() - start < timeout:
+        # Try public share endpoint
+        if sid:
+            try:
+                result = get_share_result(sid)
+                data = result.get("data") if isinstance(result, dict) else None
+                if data and isinstance(data, dict):
+                    total = data.get("totalScore", data.get("total_score"))
+                    if total is not None:
+                        return data
+            except ApiError:
+                pass
+
+        # Use task/next as a status probe (works during 'scoring' state)
         try:
-            result = _request("POST", f"{TASK_BASE}/task/next")
-            data = result.get("data") if isinstance(result, dict) else None
-            if data is None:
-                time.sleep(interval)
-                continue
-            if isinstance(data, dict):
-                status = data.get("status")
-                if status == "completed" or data.get("totalScore") is not None:
-                    return data
-                if status == "scoring":
-                    time.sleep(interval)
-                    continue
+            _request("POST", f"{TASK_BASE}/task/next")
         except ApiError as e:
-            if e.code in (2203, 2002):
-                time.sleep(interval)
-                continue
-            raise
+            if e.code == 2002:
+                # SESSION_INVALID_STATUS — scoring in progress
+                scoring_detected = True
+            elif e.code == 2203:
+                # ALL_TASKS_COMPLETED — scoring may be done
+                scoring_detected = True
+            elif e.http_status == 401:
+                # bk- token rejected — session completed
+                scoring_detected = True
+                if sid:
+                    try:
+                        result = get_share_result(sid)
+                        data = result.get("data") if isinstance(result, dict) else None
+                        if data and isinstance(data, dict):
+                            return data
+                    except ApiError:
+                        pass
+                elif not sid:
+                    # Session completed but we don't have session_id
+                    # Try to discover it (unlikely to work since bk- is now invalid)
+                    pass
+
+        # If we detected scoring but don't have sid, try to discover it
+        if scoring_detected and not sid:
+            sid = _try_extract_session_id()
+
         time.sleep(interval)
+
     raise TimeoutError(f"Scoring did not complete within {timeout}s")

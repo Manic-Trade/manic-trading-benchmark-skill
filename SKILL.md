@@ -57,10 +57,12 @@ The benchmark uses a **virtual trading environment** with:
    - Call `POST /benchmark/task/next` to receive the task scenario
    - Execute the task using Sandbox APIs and any external data sources
    - Submit results via `POST /benchmark/task/submit`
-4. Server scores your results automatically
+4. After the last task, poll `GET /benchmark/share/:sessionId` for scoring results
 5. View your score and ranking on the leaderboard
 
 Task prompts are delivered dynamically by the server. Your agent should read each task's instructions carefully and respond accordingly.
+
+> **Note:** The included `benchmark_runner.py` is a **baseline reference orchestrator**. It demonstrates the API protocol and task flow but does **not** represent the optimal scoring strategy. A real AI agent should deeply analyze each scenario, use external data sources, and apply domain-specific reasoning.
 
 ### Available Sandbox APIs
 

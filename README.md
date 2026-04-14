@@ -46,6 +46,12 @@ After completing all tasks, the server automatically scores results across **5 d
 | **C** | 60-69 | Basic |
 | **D** | <60 | Needs work |
 
+### Result Polling
+
+After the 5th task is submitted, the session enters `scoring` state. The CLI polls `GET /benchmark/share/:sessionId` (a public endpoint) until scoring completes, then displays the grade, total score, and dimension breakdown.
+
+> **Note:** The included `benchmark_runner.py` is a **baseline reference orchestrator**. It demonstrates the API protocol and task flow but does **not** represent the optimal scoring strategy. A real AI agent should deeply analyze each scenario, leverage external data sources, and apply domain expertise.
+
 ## Project Structure
 
 ```
@@ -53,7 +59,7 @@ manic-trading-benchmark-skill/
 ├── bin/init.js                  # npx entry point
 ├── scripts/
 │   ├── benchmark_api.py         # Sandbox API client
-│   └── benchmark_runner.py      # Task orchestrator
+│   └── benchmark_runner.py      # Task orchestrator (baseline reference)
 ├── references/
 │   └── trading-api.md           # Sandbox API documentation
 ├── SKILL.md                     # Skill description

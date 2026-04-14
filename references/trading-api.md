@@ -96,11 +96,15 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `command` | string | **Yes** | API command name: `get-prices`, `get-price`, `get-account`, `open-position`, `close-position`, `position-history` |
+| `command` | string | **Yes** | API command name (see recognized values below) |
 | `httpStatus` | number | No | HTTP status code of the response |
 | `requestMs` | number | No | Request duration in milliseconds |
 | `request` | object | No | Request parameters sent |
 | `response` | object | No | Response data received |
+
+> **Important:** `command` values must match the scoring engine's recognized commands:
+> `get-prices`, `get-price`, `get-account`, `open-position`, `close-position`, `position-history`.
+> Using endpoint paths (e.g. `"GET /agent/asset/prices"`) instead of command names will not be scored.
 
 **`external_api_calls` item format:**
 
@@ -259,14 +263,22 @@ Close a position early (before duration expires).
 ```json
 {
   "data": {
-    "status": "closed",
     "position_id": "sbx_ApcTw29wn4UVPm5t...",
-    "exit_price": 7068000000000,
-    "price_exponent": -8,
-    "pnl": 500000
+    "outcome": "win",
+    "settlement_price": 7068000000000,
+    "pnl": 10000000,
+    "payout": 20000000
   }
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `position_id` | The closed position ID |
+| `outcome` | `"win"` or `"loss"` |
+| `settlement_price` | Price at close (raw format) |
+| `pnl` | Profit/loss in base units |
+| `payout` | Total payout (0 on loss, `amount × multiplier` on win) |
 
 ---
 
@@ -274,31 +286,34 @@ Close a position early (before duration expires).
 
 Get all positions for this benchmark session.
 
-**Response:**
+**Response** (fields are camelCase):
 ```json
 {
   "data": [
     {
-      "position_id": "sbx_ApcTw29wn4UVPm5t...",
+      "positionId": "sbx_ApcTw29wn4UVPm5t...",
       "asset": "btc",
       "side": "call",
-      "amount": 10000000,
-      "duration_seconds": 120,
-      "target_multiplier": 2.0,
-      "entry_price": 7050600000000,
-      "price_exponent": -8,
-      "settlement_price": null,
+      "amount": "10000000",
+      "durationSeconds": 120,
+      "targetMultiplier": 2.0,
+      "entryPrice": "7050600000000",
+      "priceExponent": -8,
+      "settlementPrice": null,
       "status": "active",
       "outcome": null,
       "pnl": null,
-      "tx_hash": "sandbox_7f8a9b3c...",
-      "opened_at": "2026-04-07T12:00:00Z",
-      "expires_at": "2026-04-07T12:02:00Z",
-      "settled_at": null
+      "payout": null,
+      "txHash": "sandbox_7f8a9b3c...",
+      "openedAt": "2026-04-07T12:00:00.000Z",
+      "expiresAt": "2026-04-07T12:02:00.000Z",
+      "settledAt": null
     }
   ]
 }
 ```
+
+> **Note:** `amount`, `entryPrice`, `settlementPrice`, `pnl`, and `payout` are returned as **strings** (BigInt serialization). `targetMultiplier` is a number.
 
 **Position status:** `active` → `settled` (auto at expiry) or `closed` (manual via close-position)
 
@@ -402,3 +417,34 @@ Your agent should check `code` in the response body, not just the HTTP status.
 | 401 | Authentication header missing or malformed |
 | 500 | Internal server error |
 | 503 | Upstream service unavailable (Manic API) |
+
+---
+
+## Result Polling
+
+After all 5 tasks are submitted, the session enters `scoring` state. The bk- token remains valid during scoring but becomes invalid once scoring completes (status changes to `completed`).
+
+### GET /benchmark/share/:sessionId
+
+Public endpoint (no authentication required). Returns scoring results for a completed session.
+
+**Response:**
+```json
+{
+  "data": {
+    "totalScore": 76,
+    "grade": "B",
+    "scoreData": 17,
+    "scoreIntel": 14,
+    "scoreAnalysis": 16,
+    "scoreDecision": 15,
+    "scoreRisk": 14,
+    "agentName": "My Agent"
+  }
+}
+```
+
+**Polling strategy:**
+1. After the last `task/submit` (where `next_task` is `null`), start polling
+2. Call `GET /benchmark/share/:sessionId` every 3 seconds
+3. When `totalScore` is present in the response, scoring is complete

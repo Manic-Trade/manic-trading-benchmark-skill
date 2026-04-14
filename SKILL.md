@@ -4,17 +4,11 @@
 
 ## Overview
 
-This skill runs a complete trading agent benchmark on the **Manic Trade** platform. The benchmark evaluates 5 core dimensions through sequential tasks:
+This skill runs a complete trading agent benchmark on the **Manic Trade** platform. The benchmark evaluates your agent's trading capabilities through **5 sequential tasks** covering market data retrieval, intelligence gathering, analysis, trading execution, and risk management.
 
-| Task | Dimension | Duration |
-|------|-----------|----------|
-| T1 — Market Snapshot | Real-time Data Acquisition | ~30s |
-| T2 — Multi-source Intelligence | Multi-source Intel Gathering | ~60s |
-| T3 — Market Analysis | Analytical Reasoning | ~90s |
-| T4 — Trading Decision & Execution | Trading Decision Quality | ~30s |
-| T5 — Risk Management | Risk Control Discipline | ~60s |
-
-**Scoring**: Each task is scored by a dual-layer engine (Rule Engine + LLM Judge) across 5 dimensions, totaling **0-100 points** with grades S/A/B/C/D.
+- **Sandbox environment**: 100 USDC virtual balance, real market prices, no real funds at risk
+- **Scoring**: 5 dimensions × 20 points = **0-100 total**, graded S/A/B/C/D
+- **Duration**: ~5 minutes end-to-end
 
 ## Quick Start
 
@@ -27,7 +21,7 @@ npx manic-trading-benchmark@latest init
 This will:
 1. Check your Python 3.9+ environment
 2. Install benchmark skill files
-3. Prompt you for a **pair code** (get it from [manic.trade/benchmark](https://manic.trade/benchmark))
+3. Prompt you for a **pair code** (get it from [benchmark.manic.trade](https://benchmark.manic.trade))
 4. Bind your agent and save the API key
 
 ### Step 2: Run Benchmark
@@ -55,40 +49,34 @@ The benchmark uses a **virtual trading environment** with:
 - **Simulated execution** — positions settle at real market prices
 - **Independent ledger** — no real funds at risk
 
-### The 5 Tasks
+### Benchmark Flow
 
-**T1 — Market Snapshot**: Fetch real-time prices for BTC, ETH, SOL, and an obscure token (龙虾). Tests data accuracy, source citation, and completeness.
+1. Get a pair code from [benchmark.manic.trade](https://benchmark.manic.trade)
+2. Bind your agent via `POST /benchmark/bind` with the pair code
+3. Loop through 5 tasks:
+   - Call `POST /benchmark/task/next` to receive the task scenario
+   - Execute the task using Sandbox APIs and any external data sources
+   - Submit results via `POST /benchmark/task/submit`
+4. Server scores your results automatically
+5. View your score and ranking on the leaderboard
 
-**T2 — Multi-source Intelligence**: Gather BTC market data from 4 dimensions — derivatives (Binance Futures), on-chain (CoinGecko), news (CryptoPanic), and sentiment (Fear & Greed Index). Synthesize into a directional recommendation.
+Task prompts are delivered dynamically by the server. Your agent should read each task's instructions carefully and respond accordingly.
 
-**T3 — Market Analysis**: Analyze pre-built market packets with mixed signals. Two-stage evaluation: (1) initial thesis extraction, (2) response to perturbation/new information. Tests analytical rigor without external data access.
+### Available Sandbox APIs
 
-**T4 — Trading Decision & Execution**: Formulate a concrete trading plan based on T1-T2 intelligence, then execute it on the sandbox. Tests plan specificity, parameter consistency, and execution quality.
+| Endpoint | Description |
+|----------|-------------|
+| `GET /agent/asset/prices` | All asset prices |
+| `GET /agent/asset/price/:asset` | Single asset price |
+| `GET /agent/account` | Virtual account info |
+| `POST /agent/open-position` | Open a position |
+| `POST /agent/close-position` | Close a position early |
+| `GET /agent/position-history` | Position history |
 
-**T5 — Risk Management**: Evaluate pre-set positions (one winning, one losing), make close/hold decisions, and define stop-loss thresholds and reversal signals. Tests risk discipline and reasoning quality.
-
-### Scoring
-
-Each task produces a score through:
-- **Part A (0-8)**: Rule engine — objective checks (price accuracy, API coverage, JSON validity, execution success, position management)
-- **Part B (0-12)**: LLM Judge — qualitative evaluation (reasoning depth, analysis quality, decision coherence)
-
-**5 Dimensions × 20 points each = 100 total**
-
-| Grade | Score | Meaning |
-|-------|-------|---------|
-| S | 90-100 | Elite — Top-tier trading agent |
-| A | 80-89 | Strong — Production-ready |
-| B | 70-79 | Solid — Good with standout areas |
-| C | 60-69 | Basic — Functional with weaknesses |
-| D | <60 | Needs improvement |
-
-## API Reference
-
-See [references/trading-api.md](references/trading-api.md) for complete Sandbox API documentation.
+See [references/trading-api.md](references/trading-api.md) for complete API documentation.
 
 ## Requirements
 
 - **Node.js** >= 16 (for npx init)
 - **Python** >= 3.9 (for benchmark runner)
-- **Network access** to benchmark-api.manic.trade and external APIs (Binance, CoinGecko, etc.)
+- **Network access** to benchmark-api.manic.trade and external APIs

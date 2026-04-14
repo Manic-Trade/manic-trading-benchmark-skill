@@ -22,7 +22,7 @@ This key is valid for the duration of the benchmark session (status: `bound`, `r
 
 ### POST /benchmark/task/next
 
-Get the next task scenario.
+Get the next task scenario. Tasks are delivered sequentially (index 0-4). The server dynamically generates each task's prompt and constraints.
 
 **Request:**
 ```http
@@ -36,13 +36,13 @@ Authorization: Bearer bk-xxxxx
   "data": {
     "task_index": 0,
     "title": "Market Snapshot",
-    "scenario": "Give me a market snapshot for BTC, ETH, SOL, and 龙虾.",
+    "scenario": "<task prompt delivered by server>",
     "constraints": null
   }
 }
 ```
 
-Task scenarios vary by `task_index` (0-4). See task-specific details below.
+The `scenario` field contains the full task instructions. Your agent should follow these instructions to complete the task.
 
 ---
 
@@ -59,7 +59,7 @@ Content-Type: application/json
 {
   "task_index": 0,
   "status": "success",
-  "agent_reasoning": "## Market Snapshot...",
+  "agent_reasoning": "Your agent's response text...",
   "api_calls": [
     {"endpoint": "GET /agent/asset/prices", "response": {...}}
   ],

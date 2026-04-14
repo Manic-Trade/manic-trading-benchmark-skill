@@ -223,7 +223,7 @@ async function bindAgent() {
 
     if (res.status !== 200 && res.status !== 201) {
       const msg =
-        res.data?.msg || res.data?.message || res.data?.error || JSON.stringify(res.data);
+        res.data?.msg || res.data?.error || JSON.stringify(res.data);
       console.error(`\n  ${c.red}✗ Binding failed (HTTP ${res.status}): ${msg}${c.reset}\n`);
       process.exit(1);
     }

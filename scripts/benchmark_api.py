@@ -51,7 +51,7 @@ def _request(method, url, headers=None, json_body=None, timeout=30):
 
     The server uses a unified response format:
       Success: {"code": 0, "msg": "ok", "data": {...}}
-      Error:   {"code": <int>, "msg": "<message>", "data": null}
+      Error:   {"code": <int>, "msg": "<error text>", "data": null}
 
     Business errors are returned as HTTP 200 with a non-zero code.
     """

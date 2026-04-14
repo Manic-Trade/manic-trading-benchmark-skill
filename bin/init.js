@@ -185,7 +185,7 @@ async function bindAgent() {
     `\n${c.blue}[3/4]${c.reset} Agent binding`
   );
   console.log(
-    `\n  ${c.dim}Get your pair code from: ${c.cyan}https://manic.trade/benchmark${c.reset}`
+    `\n  ${c.dim}Get your pair code from: ${c.cyan}https://benchmark.manic.trade${c.reset}`
   );
   console.log(
     `  ${c.dim}Login with Twitter → Fill in Bot Name → Copy the pair code${c.reset}\n`

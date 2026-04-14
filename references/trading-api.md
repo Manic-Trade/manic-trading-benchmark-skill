@@ -61,10 +61,20 @@ Content-Type: application/json
   "status": "success",
   "agent_reasoning": "Your agent's response text...",
   "api_calls": [
-    {"endpoint": "GET /agent/asset/prices", "response": {...}}
+    {
+      "command": "get-prices",
+      "httpStatus": 200,
+      "request": {},
+      "response": {"data": [...]}
+    }
   ],
   "external_api_calls": [
-    {"source": "CoinGecko", "url": "https://...", "response": {...}}
+    {
+      "source": "CoinGecko",
+      "url": "https://api.coingecko.com/...",
+      "httpStatus": 200,
+      "response": {...}
+    }
   ],
   "duration_ms": 5200
 }
@@ -75,11 +85,32 @@ Content-Type: application/json
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `task_index` | number | Yes | Task index (0-4), must match current task |
-| `status` | string | Yes | `"success"` or `"failed"` |
+| `status` | string | Yes | `"success"`, `"failed"`, or `"timeout"` |
 | `agent_reasoning` | string | No | Agent's answer (max ~3000 tokens recommended) |
-| `api_calls` | array | No | List of Sandbox API calls made |
-| `external_api_calls` | array | No | List of external API calls made |
+| `api_calls` | array | No | Sandbox API calls (see `api_calls` format below) |
+| `external_api_calls` | array | No | External API calls (see format below) |
 | `duration_ms` | number | No | Execution time in milliseconds |
+| `context` | object | No | Cross-task context to carry forward |
+
+**`api_calls` item format:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `command` | string | **Yes** | API command name: `get-prices`, `get-price`, `get-account`, `open-position`, `close-position`, `position-history` |
+| `httpStatus` | number | No | HTTP status code of the response |
+| `requestMs` | number | No | Request duration in milliseconds |
+| `request` | object | No | Request parameters sent |
+| `response` | object | No | Response data received |
+
+**`external_api_calls` item format:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source` | string | **Yes** | Data source name (e.g., "CoinGecko", "Binance") |
+| `url` | string | No | Full URL called |
+| `httpStatus` | number | No | HTTP status code |
+| `requestMs` | number | No | Request duration in milliseconds |
+| `response` | any | No | Response data received |
 
 ---
 
@@ -322,15 +353,52 @@ Early close via `close-position` settles immediately at current market price.
 
 ---
 
-## Error Codes
+## Response Format
 
-| HTTP Status | Error | Description |
-|-------------|-------|-------------|
-| 400 | `INVALID_PARAMS` | Missing or invalid parameters |
-| 401 | `UNAUTHORIZED` | Missing or invalid API key |
-| 403 | `SESSION_EXPIRED` | Session is no longer active |
-| 404 | `NOT_FOUND` | Resource not found |
-| 409 | `TASK_ORDER_ERROR` | Task index doesn't match current task |
-| 422 | `INSUFFICIENT_BALANCE` | Not enough virtual balance |
-| 429 | `RATE_LIMIT` | Too many requests |
-| 500 | `INTERNAL_ERROR` | Server error |
+All endpoints return a unified JSON response:
+
+```json
+{
+  "code": 0,
+  "msg": "ok",
+  "data": { ... }
+}
+```
+
+On success, `code` is `0` and `data` contains the result. On business errors, the server returns **HTTP 200** with a non-zero `code` and `data: null`:
+
+```json
+{
+  "code": 2100,
+  "msg": "Insufficient virtual balance",
+  "data": null
+}
+```
+
+Your agent should check `code` in the response body, not just the HTTP status.
+
+**Business Error Codes:**
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1001 | `INVALID_PARAMS` | Missing or invalid parameters |
+| 1102 | `INVALID_TOKEN` | Missing or invalid API key |
+| 2001 | `SESSION_EXPIRED` | Benchmark session has expired |
+| 2002 | `SESSION_INVALID_STATUS` | Invalid session status for this operation |
+| 2100 | `INSUFFICIENT_BALANCE` | Not enough virtual balance |
+| 2101 | `INVALID_AMOUNT` | Amount must be 5-20 USDC |
+| 2102 | `INVALID_ASSET` | Unsupported asset |
+| 2103 | `POSITION_NOT_FOUND` | Position not found |
+| 2104 | `POSITION_ALREADY_SETTLED` | Position has already been settled |
+| 2105 | `MAX_POSITION_RATIO_EXCEEDED` | Position exceeds 50% of balance |
+| 2200 | `TASK_NOT_FOUND` | Task not found |
+| 2202 | `TASK_OUT_OF_ORDER` | Tasks must be completed in order |
+| 2203 | `ALL_TASKS_COMPLETED` | All tasks have been completed |
+
+**HTTP Error Codes** (non-200 responses, for infrastructure-level errors):
+
+| HTTP Status | Description |
+|-------------|-------------|
+| 401 | Authentication header missing or malformed |
+| 500 | Internal server error |
+| 503 | Upstream service unavailable (Manic API) |

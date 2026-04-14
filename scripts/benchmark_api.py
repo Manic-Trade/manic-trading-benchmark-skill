@@ -13,7 +13,6 @@ import requests
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env from project root
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(_env_path)
 
@@ -35,8 +34,25 @@ def _agent_headers():
     }
 
 
+class ApiError(Exception):
+    """Raised when the server returns a business error (code != 0) or HTTP error."""
+    def __init__(self, code, msg, data=None, http_status=None):
+        self.code = code
+        self.msg = msg
+        self.data = data
+        self.http_status = http_status
+        super().__init__(f"[{code}] {msg}")
+
+
 def _request(method, url, headers=None, json_body=None, timeout=30):
-    """Make HTTP request with error handling."""
+    """Make HTTP request with error handling.
+
+    The server uses a unified response format:
+      Success: {"code": 0, "msg": "ok", "data": {...}}
+      Error:   {"code": <int>, "msg": "<message>", "data": null}
+
+    Business errors are returned as HTTP 200 with a non-zero code.
+    """
     try:
         resp = requests.request(
             method,
@@ -45,18 +61,32 @@ def _request(method, url, headers=None, json_body=None, timeout=30):
             json=json_body,
             timeout=timeout,
         )
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.HTTPError as e:
-        try:
-            detail = resp.json()
-        except Exception:
-            detail = resp.text
-        raise RuntimeError(
-            f"API error {resp.status_code} on {method} {url}: {detail}"
-        ) from e
+        body = resp.json()
     except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Network error on {method} {url}: {e}") from e
+        raise ApiError(code=-1, msg=f"Network error on {method} {url}: {e}") from e
+    except (ValueError, json.JSONDecodeError):
+        if resp.status_code >= 400:
+            raise ApiError(
+                code=resp.status_code,
+                msg=f"HTTP {resp.status_code}: {resp.text[:200]}",
+                http_status=resp.status_code,
+            )
+        return resp.text
+
+    if resp.status_code >= 400:
+        code = body.get("code", resp.status_code) if isinstance(body, dict) else resp.status_code
+        msg = body.get("msg", str(body)) if isinstance(body, dict) else str(body)
+        raise ApiError(code=code, msg=msg, data=body, http_status=resp.status_code)
+
+    if isinstance(body, dict) and "code" in body and body["code"] != 0:
+        raise ApiError(
+            code=body["code"],
+            msg=body.get("msg", "Unknown business error"),
+            data=body.get("data"),
+            http_status=resp.status_code,
+        )
+
+    return body
 
 
 # ─── Task Orchestration ──────────────────────────────────────────────────────
@@ -140,30 +170,33 @@ def get_position_history():
     return _request("GET", f"{BENCHMARK_API_BASE}/position-history")
 
 
-# ─── Session Status ───────────────────────────────────────────────────────────
-
-def get_session_status(session_id):
-    """GET /benchmark/session/:id/status — Poll session status (requires JWT, used for reference)."""
-    return _request("GET", f"{TASK_BASE}/session/{session_id}/status")
-
+# ─── Scoring Poll ────────────────────────────────────────────────────────────
 
 def poll_score(timeout=120, interval=3):
-    """Poll task/next until scoring is complete, or use session status.
+    """Poll task/next until scoring is complete.
 
-    After T5 submit, keep calling task/next. When status becomes 'completed',
-    the response will contain final scores.
+    After all tasks are submitted, the session enters 'scoring' state.
+    Keep polling until the server returns the final results.
     """
     start = time.time()
     while time.time() - start < timeout:
         try:
             result = _request("POST", f"{TASK_BASE}/task/next")
-            data = result.get("data", result)
-            if data.get("status") == "completed" or data.get("totalScore") is not None:
-                return data
-            if data.get("status") == "scoring":
+            data = result.get("data") if isinstance(result, dict) else None
+            if data is None:
                 time.sleep(interval)
                 continue
-        except RuntimeError:
-            pass
+            if isinstance(data, dict):
+                status = data.get("status")
+                if status == "completed" or data.get("totalScore") is not None:
+                    return data
+                if status == "scoring":
+                    time.sleep(interval)
+                    continue
+        except ApiError as e:
+            if e.code in (2203, 2002):
+                time.sleep(interval)
+                continue
+            raise
         time.sleep(interval)
     raise TimeoutError(f"Scoring did not complete within {timeout}s")

@@ -1,8 +1,8 @@
 ---
 name: manic-trading-benchmark-skill
-description: Evaluate AI trading agents across 5 standardized tasks on a sandbox trading engine with real market prices. Covers market data retrieval, intelligence gathering, analysis, trading execution, and risk management. Uses a virtual 100 USDC balance with real-time prices — no real funds at risk.
+description: Run a standardized benchmark to evaluate AI trading agent capabilities on the Manic Trade platform. Use this skill when a user wants to benchmark their trading agent, run a trading evaluation, score their AI agent's trading ability, or test trading performance. Covers market data retrieval, intelligence gathering, analysis, trading execution, and risk management across 5 tasks with a virtual 100 USDC balance and real-time prices.
 metadata:
-  author: Manic-Team
+  author: Manic-Trade
   version: "1.0.0"
   platform: manic.trade
   chain: solana
@@ -10,85 +10,149 @@ metadata:
 
 # Manic Trading Benchmark Skill
 
-> Evaluate AI trading agents across 5 standardized tasks on a sandbox trading engine with real market prices.
+Run a complete trading agent benchmark on [Manic Trade](https://manic.trade). Evaluates 5 dimensions: real-time data, multi-source intelligence, market analysis, trading execution, and risk management. Scored 0-100 with grades S/A/B/C/D.
 
-## Overview
+## When to Use
 
-This skill runs a complete trading agent benchmark on the **Manic Trade** platform. The benchmark evaluates your agent's trading capabilities through **5 sequential tasks** covering market data retrieval, intelligence gathering, analysis, trading execution, and risk management.
+Use this skill when the user asks to:
+- Benchmark or evaluate their AI trading agent
+- Run a trading capability test or score
+- Test trading performance on Manic
 
-- **Sandbox environment**: 100 USDC virtual balance, real market prices, no real funds at risk
-- **Scoring**: 5 dimensions × 20 points = **0-100 total**, graded S/A/B/C/D
-- **Duration**: ~5 minutes end-to-end
+## Step 1: Get Pair Code
 
-## Quick Start
+Before running the benchmark, a **pair code** is required. If the user has not provided one, ask them to:
 
-### Step 1: Install & Bind
+1. Go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark)
+2. Login with Twitter
+3. Fill in their Bot Name
+4. Copy the pair code (format: `MANIC-XXXX-XXXX`)
 
-```bash
-npx manic-trading-benchmark@latest init
-```
+Then ask the user to paste the pair code.
 
-This will:
-1. Check your Python 3.9+ environment
-2. Install benchmark skill files
-3. Prompt you for a **pair code** (get it from [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark))
-4. Bind your agent and save the API key
+## Step 2: Bind Agent
 
-### Step 2: Run Benchmark
-
-After binding, the script will ask if you want to start immediately. You can also run it later:
+Once you have the pair code, bind the agent by calling the bind API:
 
 ```bash
-python3 scripts/benchmark_runner.py
+curl -s -X POST https://benchmark-api-stg.manic.trade/api/benchmark/bind \
+  -H "Content-Type: application/json" \
+  -d '{"pair_code": "<PAIR_CODE>", "agent_name": "<AGENT_NAME>"}'
 ```
 
-## Commands
+Replace `<PAIR_CODE>` with the user's pair code (e.g. `MANIC-A1B2-C3D4`), and `<AGENT_NAME>` with the agent's name.
 
-| Command | Description |
-|---------|-------------|
-| `npx manic-trading-benchmark init` | Full setup: install, bind, and run |
-| `python3 scripts/benchmark_runner.py` | Run the benchmark (requires .env with API key) |
+The response contains:
+```json
+{
+  "data": {
+    "binding_id": "123456789",
+    "api_key": "bk-abc123def456...",
+    "sandbox_base_url": "https://benchmark-api-stg.manic.trade/api/agent"
+  }
+}
+```
 
-## How It Works
+Save `api_key` and `binding_id` from the response. Write them to `${SKILL_DIR}/.env`:
 
-### Sandbox Trading Engine
+```
+BENCHMARK_API_KEY=<api_key from response>
+BENCHMARK_API_BASE=<sandbox_base_url from response>
+BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
+BENCHMARK_SESSION_ID=<binding_id from response>
+```
 
-The benchmark uses a **virtual trading environment** with:
-- **Real-time prices** from Manic Trading API
-- **100 USDC virtual balance** per session
-- **Simulated execution** — positions settle at real market prices
-- **Independent ledger** — no real funds at risk
+## Step 3: Run Benchmark
 
-### Benchmark Flow
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_runner.py
+```
 
-1. Get a pair code from [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark)
-2. Bind your agent via `POST /benchmark/bind` with the pair code
-3. Loop through 5 tasks:
-   - Call `POST /benchmark/task/next` to receive the task scenario
-   - Execute the task using Sandbox APIs and any external data sources
-   - Submit results via `POST /benchmark/task/submit`
-4. After the last task, poll `GET /benchmark/share/:sessionId` for scoring results
-5. View your score and ranking on the leaderboard
+This executes all 5 tasks sequentially (~5 minutes), then polls for scoring results and displays the grade.
 
-Task prompts are delivered dynamically by the server. Your agent should read each task's instructions carefully and respond accordingly.
+## Benchmark Tasks
 
-> **Note:** The included `benchmark_runner.py` is a **baseline reference orchestrator**. It demonstrates the API protocol and task flow but does **not** represent the optimal scoring strategy. A real AI agent should deeply analyze each scenario, use external data sources, and apply domain-specific reasoning.
+| # | Task | Tests |
+|---|------|-------|
+| T1 | Market Snapshot | Real-time data retrieval |
+| T2 | Multi-source Intelligence | External data gathering |
+| T3 | Market Analysis | Analytical reasoning |
+| T4 | Trading Decision & Execution | Position management |
+| T5 | Risk Management | Risk controls |
 
-### Available Sandbox APIs
+**Important:** The included `benchmark_runner.py` is a **baseline reference**. A real AI agent should deeply analyze each scenario, use external data sources, and apply domain-specific reasoning to maximize scores.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /agent/asset/prices` | All asset prices |
-| `GET /agent/asset/price/:asset` | Single asset price |
-| `GET /agent/account` | Virtual account info |
-| `POST /agent/open-position` | Open a position |
-| `POST /agent/close-position` | Close a position early |
-| `GET /agent/position-history` | Position history |
+## Available Sandbox Trading APIs
 
-See [references/trading-api.md](references/trading-api.md) for complete API documentation.
+These APIs use the `BENCHMARK_API_KEY` from `.env` for authentication.
 
-## Requirements
+**Get all asset prices:**
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_api.py get-prices
+```
 
-- **Node.js** >= 16 (for npx init)
-- **Python** >= 3.9 (for benchmark runner)
-- **Network access** to benchmark-api-stg.manic.trade and external APIs
+**Get single asset price:**
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_api.py get-price --asset btc
+```
+Assets: `btc`, `eth`, `sol`, `gold`, `silver`, `spy`, `xmr`, `pyth`, `layer`, `drift`
+
+**Get account info (virtual balance, stats):**
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_api.py get-account
+```
+
+**Open a position:**
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_api.py open-position \
+  --asset btc --side call --amount 10000000 --duration 60
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--asset` | Yes | `btc`, `eth`, `sol`, `gold`, `silver`, `spy`, `xmr`, `pyth`, `layer`, `drift` |
+| `--side` | Yes | `call` (price goes up) or `put` (price goes down) |
+| `--amount` | Yes | Stake in base units (1000000 = 1 USDC, 10000000 = 10 USDC) |
+| `--duration` | No | Seconds: 30, 60, 120, 180, 240, 300 (default: 60) |
+
+**Close a position early:**
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_api.py close-position \
+  --position-id <position_id> --asset btc
+```
+
+**Get position history:**
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_api.py position-history --page 1 --limit 10
+```
+
+## Scoring
+
+| Grade | Score | Level |
+|-------|-------|-------|
+| **S** | 90-100 | Elite |
+| **A** | 80-89 | Strong |
+| **B** | 70-79 | Solid |
+| **C** | 60-69 | Basic |
+| **D** | <60 | Needs work |
+
+5 dimensions × 20 points each = 100 total.
+
+## Key Rules
+
+- **Amount is in base units.** USDC has 6 decimals: 1000000 = 1 USDC, 10000000 = 10 USDC.
+- **Side meaning.** `call` = bullish (up), `put` = bearish (down).
+- **Durations.** 30, 60, 120, 180, 240, 300 seconds.
+- **Sandbox only.** Virtual 100 USDC balance, no real funds at risk.
+
+## Supported Assets
+
+| Asset | Type | Hours |
+|-------|------|-------|
+| BTC, ETH, SOL, XMR, PYTH, LAYER, DRIFT | Crypto | 24/7 |
+| GOLD, SILVER | Commodities | Exchange hours |
+| SPY | Equity | Exchange hours |
+
+## References
+
+See `${SKILL_DIR}/references/trading-api.md` for the complete API documentation with request/response examples.

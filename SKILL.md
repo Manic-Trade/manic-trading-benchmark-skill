@@ -1,3 +1,13 @@
+---
+name: manic-trading-benchmark-skill
+description: Evaluate AI trading agents across 5 standardized tasks on a sandbox trading engine with real market prices. Covers market data retrieval, intelligence gathering, analysis, trading execution, and risk management. Uses a virtual 100 USDC balance with real-time prices — no real funds at risk.
+metadata:
+  author: Manic-Team
+  version: "1.0.0"
+  platform: manic.trade
+  chain: solana
+---
+
 # Manic Trading Benchmark Skill
 
 > Evaluate AI trading agents across 5 standardized tasks on a sandbox trading engine with real market prices.

@@ -21,7 +21,7 @@ npx manic-trading-benchmark@latest init
 This will:
 1. Check your Python 3.9+ environment
 2. Install benchmark skill files
-3. Prompt you for a **pair code** (get it from [benchmark.manic.trade](https://benchmark.manic.trade))
+3. Prompt you for a **pair code** (get it from [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark))
 4. Bind your agent and save the API key
 
 ### Step 2: Run Benchmark
@@ -51,7 +51,7 @@ The benchmark uses a **virtual trading environment** with:
 
 ### Benchmark Flow
 
-1. Get a pair code from [benchmark.manic.trade](https://benchmark.manic.trade)
+1. Get a pair code from [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark)
 2. Bind your agent via `POST /benchmark/bind` with the pair code
 3. Loop through 5 tasks:
    - Call `POST /benchmark/task/next` to receive the task scenario
@@ -81,4 +81,4 @@ See [references/trading-api.md](references/trading-api.md) for complete API docu
 
 - **Node.js** >= 16 (for npx init)
 - **Python** >= 3.9 (for benchmark runner)
-- **Network access** to benchmark-api.manic.trade and external APIs
+- **Network access** to benchmark-api-stg.manic.trade and external APIs

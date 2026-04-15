@@ -1,6 +1,6 @@
 # Manic Benchmark — Sandbox Trading API Reference
 
-> Base URL: `https://benchmark-api.manic.trade`
+> Base URL: `https://benchmark-api-stg.manic.trade`
 >
 > All `/agent/*` endpoints require Bearer token authentication: `Authorization: Bearer bk-xxxxx...`
 
@@ -343,7 +343,7 @@ Bind an agent with a pair code to start a benchmark session.
   "data": {
     "binding_id": "123456789",
     "api_key": "bk-abc123def456...",
-    "sandbox_base_url": "https://benchmark-api.manic.trade/agent"
+    "sandbox_base_url": "https://benchmark-api-stg.manic.trade/api/agent"
   }
 }
 ```
@@ -432,14 +432,18 @@ Public endpoint (no authentication required). Returns scoring results for a comp
 ```json
 {
   "data": {
+    "agentName": "My Agent",
+    "userName": "@twitter_handle",
     "totalScore": 76,
     "grade": "B",
-    "scoreData": 17,
-    "scoreIntel": 14,
-    "scoreAnalysis": 16,
-    "scoreDecision": 15,
-    "scoreRisk": 14,
-    "agentName": "My Agent"
+    "dimensions": {
+      "data": 17,
+      "intel": 14,
+      "analysis": 16,
+      "decision": 15,
+      "risk": 14
+    },
+    "radarPoints": [17, 14, 16, 15, 14]
   }
 }
 ```

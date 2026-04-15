@@ -20,11 +20,11 @@ load_dotenv(_env_path)
 # ─── Configuration ────────────────────────────────────────────────────────────
 
 BENCHMARK_API_KEY = os.getenv("BENCHMARK_API_KEY", "")
-BENCHMARK_API_BASE = os.getenv("BENCHMARK_API_BASE", "https://benchmark-api.manic.trade/agent")
-BENCHMARK_SERVER_BASE = os.getenv("BENCHMARK_SERVER_BASE", "https://benchmark-api.manic.trade")
+BENCHMARK_API_BASE = os.getenv("BENCHMARK_API_BASE", "https://benchmark-api-stg.manic.trade/api/agent")
+BENCHMARK_SERVER_BASE = os.getenv("BENCHMARK_SERVER_BASE", "https://benchmark-api-stg.manic.trade")
 BENCHMARK_SESSION_ID = os.getenv("BENCHMARK_SESSION_ID", "")
 
-TASK_BASE = f"{BENCHMARK_SERVER_BASE}/benchmark"
+TASK_BASE = f"{BENCHMARK_SERVER_BASE}/api/benchmark"
 
 # ─── HTTP Helpers ─────────────────────────────────────────────────────────────
 
@@ -53,7 +53,10 @@ def _request(method, url, headers=None, json_body=None, timeout=30):
       Success: {"code": 0, "msg": "ok", "data": {...}}
       Error:   {"code": <int>, "msg": "<error text>", "data": null}
 
-    Business errors are returned as HTTP 200 with a non-zero code.
+    Business correctness is determined by the response body `code`:
+      - code == 0    -> success
+      - code != 0    -> business error
+    HTTP status is only used for transport/infrastructure failures.
     """
     try:
         resp = requests.request(
@@ -87,6 +90,10 @@ def _request(method, url, headers=None, json_body=None, timeout=30):
             data=body.get("data"),
             http_status=resp.status_code,
         )
+
+    # Keep HTTP status for debugging/audit fields (api_calls).
+    if isinstance(body, dict):
+        body["_http_status"] = resp.status_code
 
     return body
 
@@ -182,85 +189,42 @@ def get_share_result(session_id=None):
     sid = session_id or BENCHMARK_SESSION_ID
     if not sid:
         raise ApiError(code=-1, msg="No session ID available for result polling")
-    return _request(
-        "GET",
-        f"{TASK_BASE}/share/{sid}",
-        headers={"Content-Type": "application/json"},
-    )
-
-
-def _try_extract_session_id():
-    """Try to discover session_id via the account endpoint.
-
-    The account response may contain session metadata we can use.
-    Falls back to None if not available.
-    """
-    try:
-        result = _request("GET", f"{BENCHMARK_API_BASE}/account")
-        data = result.get("data", result) if isinstance(result, dict) else {}
-        if isinstance(data, dict):
-            return data.get("sessionId", data.get("session_id"))
-    except (ApiError, Exception):
-        pass
-    return None
+    return _request("GET", f"{TASK_BASE}/share/{sid}", headers={})
 
 
 def poll_result(session_id=None, timeout=120, interval=3):
     """Poll for scoring results after all tasks are submitted.
 
     Strategy:
-    1. Try the public share endpoint if session ID is available
-    2. Use task/next as a status probe (works during 'scoring' state)
-    3. When 401 indicates scoring is done, try share endpoint
-    4. If no session ID at all, wait for scoring then report timeout
-       with guidance to check the web UI
+    1. Try the public share endpoint (requires session ID from .env)
+    2. Use task/next as a status probe to detect scoring state
+    3. Return results once scoring is complete
     """
     sid = session_id or BENCHMARK_SESSION_ID
+    if not sid:
+        raise ApiError(code=-1, msg=(
+            "No BENCHMARK_SESSION_ID configured. "
+            "Re-run 'npx manic-trading-benchmark init' to set up a new session."
+        ))
+
     start = time.time()
-    scoring_detected = False
 
     while time.time() - start < timeout:
-        # Try public share endpoint
-        if sid:
-            try:
-                result = get_share_result(sid)
-                data = result.get("data") if isinstance(result, dict) else None
-                if data and isinstance(data, dict):
-                    total = data.get("totalScore", data.get("total_score"))
-                    if total is not None:
-                        return data
-            except ApiError:
-                pass
+        try:
+            result = get_share_result(sid)
+            data = result.get("data") if isinstance(result, dict) else None
+            if data and isinstance(data, dict):
+                total = data.get("totalScore", data.get("total_score"))
+                if total is not None:
+                    return data
+        except ApiError:
+            pass
 
-        # Use task/next as a status probe (works during 'scoring' state)
         try:
             _request("POST", f"{TASK_BASE}/task/next")
         except ApiError as e:
-            if e.code == 2002:
-                # SESSION_INVALID_STATUS — scoring in progress
-                scoring_detected = True
-            elif e.code == 2203:
-                # ALL_TASKS_COMPLETED — scoring may be done
-                scoring_detected = True
-            elif e.http_status == 401:
-                # bk- token rejected — session completed
-                scoring_detected = True
-                if sid:
-                    try:
-                        result = get_share_result(sid)
-                        data = result.get("data") if isinstance(result, dict) else None
-                        if data and isinstance(data, dict):
-                            return data
-                    except ApiError:
-                        pass
-                elif not sid:
-                    # Session completed but we don't have session_id
-                    # Try to discover it (unlikely to work since bk- is now invalid)
-                    pass
-
-        # If we detected scoring but don't have sid, try to discover it
-        if scoring_detected and not sid:
-            sid = _try_extract_session_id()
+            if e.code in (2002, 2203) or e.http_status == 401:
+                pass
 
         time.sleep(interval)
 

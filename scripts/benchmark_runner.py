@@ -18,6 +18,7 @@ import json
 import time
 import math
 import traceback
+import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import benchmark_api as api
@@ -257,16 +258,29 @@ def print_final_results(result):
     grade = data.get("grade", "D")
 
     dim_scores = {}
-    for key, dim_name in [
-        ("scoreData", "Real-time Data"), ("scoreIntel", "Multi-source Intel"),
-        ("scoreAnalysis", "Market Analysis"), ("scoreDecision", "Trading Decision"),
-        ("scoreRisk", "Risk Management"),
-        ("score_data", "Real-time Data"), ("score_intel", "Multi-source Intel"),
-        ("score_analysis", "Market Analysis"), ("score_decision", "Trading Decision"),
-        ("score_risk", "Risk Management"),
-    ]:
-        if key in data and data[key] is not None:
-            dim_scores[dim_name] = data[key]
+    dims = data.get("dimensions")
+    if isinstance(dims, dict):
+        dim_map = {
+            "data": "Real-time Data",
+            "intel": "Multi-source Intel",
+            "analysis": "Market Analysis",
+            "decision": "Trading Decision",
+            "risk": "Risk Management",
+        }
+        for key, dim_name in dim_map.items():
+            if key in dims and dims[key] is not None:
+                dim_scores[dim_name] = dims[key]
+    if not dim_scores:
+        for key, dim_name in [
+            ("scoreData", "Real-time Data"), ("scoreIntel", "Multi-source Intel"),
+            ("scoreAnalysis", "Market Analysis"), ("scoreDecision", "Trading Decision"),
+            ("scoreRisk", "Risk Management"),
+            ("score_data", "Real-time Data"), ("score_intel", "Multi-source Intel"),
+            ("score_analysis", "Market Analysis"), ("score_decision", "Trading Decision"),
+            ("score_risk", "Risk Management"),
+        ]:
+            if key in data and data[key] is not None:
+                dim_scores[dim_name] = data[key]
 
     print_grade_badge(grade, total_score)
     if dim_scores:
@@ -294,7 +308,7 @@ def print_final_results(result):
             print_trading_stats(stats)
 
     print(f"\n  {C.DIM}View full results at: "
-          f"{C.CYAN}https://benchmark.manic.trade{C.RESET}\n")
+          f"{C.CYAN}https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark{C.RESET}\n")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -312,8 +326,12 @@ def _call_record(command, request_body=None, response=None,
     if request_ms is not None:
         record["requestMs"] = request_ms
     if error is not None:
-        record["response"] = {"error": str(error)}
-        record["httpStatus"] = 0
+        if isinstance(error, dict):
+            record["response"] = {"error": error}
+            record["httpStatus"] = int(error.get("http_status") or http_status or 0)
+        else:
+            record["response"] = {"error": str(error)}
+            record["httpStatus"] = 0
     return record
 
 
@@ -327,12 +345,23 @@ def safe_call(fn, command, request_body=None, *args, **kwargs):
     try:
         result = fn(*args, **kwargs)
         ms = int((time.time() - start) * 1000)
-        data = result.get("data", result) if isinstance(result, dict) else result
-        record = _call_record(command, request_body, data, 200, ms)
+        http_status = 200
+        if isinstance(result, dict):
+            http_status = int(result.get("_http_status", 200) or 200)
+            data = result.get("data", result)
+        else:
+            data = result
+        record = _call_record(command, request_body, data, http_status, ms)
         return data, record
     except api.ApiError as e:
         ms = int((time.time() - start) * 1000)
-        record = _call_record(command, request_body, error=e, request_ms=ms,
+        error_info = {
+            "code": e.code,
+            "msg": e.msg,
+            "http_status": e.http_status,
+            "data": e.data,
+        }
+        record = _call_record(command, request_body, error=error_info, request_ms=ms,
                               http_status=e.http_status or 0)
         return None, record
     except Exception as e:
@@ -432,6 +461,12 @@ def execute_task(task_index, task_data, context):
             reasoning_parts.append(f"- **{asset.upper()}**: ${info['display']:,.2f}")
         reasoning_parts.append("")
 
+    # ── Task2 prefers external signals for multi-source scoring ──
+    if task_index == 1:
+        intel_reasoning, intel_calls = _collect_external_intel(price_map)
+        external_calls.extend(intel_calls)
+        reasoning_parts.extend(intel_reasoning)
+
     # ── Check for structured analysis cases (e.g. market packet scenarios) ──
     cases = extra.get("cases", [])
     if cases and isinstance(cases, list):
@@ -507,9 +542,20 @@ def _handle_structured_cases(cases):
         else:
             observations = []
 
-        # Classify by signal direction
+        # Classify by signal direction. Prefer explicit labels, then infer from content.
         bullish = [o for o in observations if o.get("signal") == "bullish"]
         bearish = [o for o in observations if o.get("signal") == "bearish"]
+
+        if not bullish and not bearish:
+            for obs in observations:
+                text = (
+                    f"{obs.get('category', '')} {obs.get('content', '')} "
+                    f"{obs.get('summary', '')}"
+                ).lower()
+                if any(k in text for k in ["bull", "breakout", "accumulation", "uptrend", "rally", "long"]):
+                    bullish.append({**obs, "weight": obs.get("weight", 1.0), "signal": "bullish"})
+                elif any(k in text for k in ["bear", "breakdown", "distribution", "downtrend", "selloff", "short"]):
+                    bearish.append({**obs, "weight": obs.get("weight", 1.0), "signal": "bearish"})
 
         bull_w = sum(float(o.get("weight", 0.5)) for o in bullish)
         bear_w = sum(float(o.get("weight", 0.5)) for o in bearish)
@@ -618,6 +664,72 @@ def _handle_structured_cases(cases):
         results.append({"case_id": case_id, "ma1": ma1, "ma2": ma2})
 
     return results
+
+
+def _collect_external_intel(price_map):
+    """Fetch a small set of external BTC intel sources (best effort)."""
+    reasoning = ["## External Intelligence\n"]
+    calls = []
+
+    sources = [
+        ("coingecko", "https://api.coingecko.com/api/v3/coins/bitcoin"),
+        ("alternative_me", "https://api.alternative.me/fng/"),
+    ]
+
+    coingecko_payload = None
+    for source, url in sources:
+        start = time.time()
+        try:
+            resp = requests.get(url, timeout=8)
+            ms = int((time.time() - start) * 1000)
+            payload = resp.json()
+            calls.append({
+                "source": source,
+                "url": url,
+                "httpStatus": resp.status_code,
+                "requestMs": ms,
+                "response": payload if isinstance(payload, dict) else {"raw": payload},
+            })
+            if source == "coingecko" and isinstance(payload, dict):
+                coingecko_payload = payload
+        except Exception as e:
+            ms = int((time.time() - start) * 1000)
+            calls.append({
+                "source": source,
+                "url": url,
+                "httpStatus": 0,
+                "requestMs": ms,
+                "response": {"error": str(e)},
+            })
+
+    if coingecko_payload:
+        md = coingecko_payload.get("market_data", {})
+        current = _to_num(md.get("current_price", {}).get("usd"))
+        change = _to_num(md.get("price_change_percentage_24h"))
+        volume = _to_num(md.get("total_volume", {}).get("usd"))
+        mcap = _to_num(md.get("market_cap", {}).get("usd"))
+        if current > 0:
+            reasoning.append("- BTC external quote (CoinGecko):")
+            reasoning.append(f"  - Price: ${current:,.2f}")
+            reasoning.append(f"  - 24h change: {change:+.2f}%")
+            reasoning.append(f"  - 24h volume: ${volume:,.0f}")
+            reasoning.append(f"  - Market cap: ${mcap:,.0f}")
+
+    if "btc" in price_map:
+        local_btc = price_map["btc"]["display"]
+        reasoning.append(f"- Sandbox BTC quote cross-check: ${local_btc:,.2f}")
+        if coingecko_payload:
+            ext_btc = _to_num(
+                coingecko_payload.get("market_data", {})
+                .get("current_price", {})
+                .get("usd")
+            )
+            if ext_btc > 0:
+                deviation = abs(local_btc - ext_btc) / ext_btc * 100
+                reasoning.append(f"  - Cross-source deviation: {deviation:.2f}%")
+
+    reasoning.append("")
+    return reasoning, calls
 
 
 def _handle_trading(scenario, constraints, price_map, account_data, context):
@@ -893,15 +1005,15 @@ def run():
                   f"cannot poll results automatically.")
             print(f"    Re-run {C.CYAN}npx manic-trading-benchmark init{C.RESET} "
                   f"to get a new session with result polling,")
-            print(f"    or check results at: {C.CYAN}https://benchmark.manic.trade{C.RESET}\n")
+            print(f"    or check results at: {C.CYAN}https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark{C.RESET}\n")
         else:
             print(f"\r  {C.YELLOW}⚠{C.RESET} Scoring is still in progress. "
                   f"Check results at:")
-            print(f"    {C.CYAN}https://benchmark.manic.trade{C.RESET}\n")
+            print(f"    {C.CYAN}https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark{C.RESET}\n")
 
     except KeyboardInterrupt:
         print(f"\n\n  {C.YELLOW}Interrupted.{C.RESET} Check results at:")
-        print(f"    {C.CYAN}https://benchmark.manic.trade{C.RESET}\n")
+        print(f"    {C.CYAN}https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark{C.RESET}\n")
 
 
 # ─── Entry Point ──────────────────────────────────────────────────────────────

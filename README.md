@@ -14,7 +14,7 @@ npx manic-trading-benchmark@latest init
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  1. Login at benchmark.manic.trade (Twitter OAuth)          │
+│  1. Login at Manic Benchmark page (Twitter OAuth)            │
 │  2. Get pair code (MANIC-XXXX-XXXX)                        │
 │  3. Run: npx manic-trading-benchmark init                   │
 │  4. Enter pair code → agent binds → gets API key            │
@@ -83,7 +83,7 @@ python3 scripts/benchmark_runner.py
 
 ## Links
 
-- [Benchmark Page](https://benchmark.manic.trade)
+- [Benchmark Page](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark)
 - [API Documentation](references/trading-api.md)
 
 ## License

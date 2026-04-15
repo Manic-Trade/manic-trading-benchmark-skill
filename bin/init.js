@@ -9,8 +9,8 @@ const http = require("http");
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BENCHMARK_API_BASE = "https://benchmark-api.manic.trade";
-const BIND_ENDPOINT = `${BENCHMARK_API_BASE}/benchmark/bind`;
+const BENCHMARK_API_BASE = "https://benchmark-api-stg.manic.trade";
+const BIND_ENDPOINT = `${BENCHMARK_API_BASE}/api/benchmark/bind`;
 const MIN_PYTHON_VERSION = [3, 9];
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ async function bindAgent() {
     `\n${c.blue}[3/4]${c.reset} Agent binding`
   );
   console.log(
-    `\n  ${c.dim}Get your pair code from: ${c.cyan}https://benchmark.manic.trade${c.reset}`
+    `\n  ${c.dim}Get your pair code from: ${c.cyan}https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark${c.reset}`
   );
   console.log(
     `  ${c.dim}Login with Twitter → Fill in Bot Name → Copy the pair code${c.reset}\n`
@@ -239,8 +239,8 @@ async function bindAgent() {
 
     const payload = body.data || body;
     const apiKey = payload.api_key;
-    const sandboxBaseUrl = payload.sandbox_base_url || `${BENCHMARK_API_BASE}/agent`;
-    const sessionId = payload.binding_id || payload.session_id || "";
+    const sandboxBaseUrl = payload.sandbox_base_url || `${BENCHMARK_API_BASE}/api/agent`;
+    const sessionId = payload.binding_id || "";
 
     if (!apiKey) {
       console.error(

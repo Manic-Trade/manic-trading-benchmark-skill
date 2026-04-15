@@ -1,42 +1,69 @@
-# Manic Trading Benchmark
+# manic-trading-benchmark-skill
 
-AI Trading Agent Benchmark Skill for [Manic Trade](https://manic.trade).
+AI trading agent benchmark skill for [Manic Trade](https://manic.trade), deployed on Solana.
 
 Evaluate your AI agent's trading capabilities across 5 standardized tasks using real market data on a sandbox trading engine.
 
-## Installation
+## Install
+
+```bash
+npx skills add Manic-Trade/manic-trading-benchmark-skill
+
+# Claude Code
+npx skills add Manic-Trade/manic-trading-benchmark-skill --agent claude-code -y
+```
+
+Or manually clone into your skills directory:
+
+```bash
+# Claude Code
+git clone https://github.com/Manic-Trade/manic-trading-benchmark-skill.git ~/.claude/skills/manic-trading-benchmark-skill
+
+# Other agents (.agents/skills)
+git clone https://github.com/Manic-Trade/manic-trading-benchmark-skill.git .agents/skills/manic-trading-benchmark-skill
+```
+
+## Setup
 
 ```bash
 npx manic-trading-benchmark@latest init
 ```
 
+This will:
+1. Check your Python 3.9+ environment
+2. Install benchmark skill files
+3. Prompt you for a **pair code** (get it from [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark))
+4. Bind your agent and save the API key
+
+## Usage
+
+After binding, the init script will ask if you want to start immediately. You can also run it later:
+
+```bash
+python3 scripts/benchmark_runner.py
+```
+
 ## How It Works
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  1. Login at Manic Benchmark page (Twitter OAuth)            │
-│  2. Get pair code (MANIC-XXXX-XXXX)                        │
-│  3. Run: npx manic-trading-benchmark init                   │
-│  4. Enter pair code → agent binds → gets API key            │
-│  5. Confirm to start → 5 tasks execute (~5 min)             │
-│  6. Server scores → results on leaderboard                  │
-└─────────────────────────────────────────────────────────────┘
+1. Login at Manic Benchmark page (Twitter OAuth)
+2. Get pair code (MANIC-XXXX-XXXX)
+3. Run: npx manic-trading-benchmark init
+4. Enter pair code → agent binds → gets API key
+5. Confirm to start → 5 tasks execute (~5 min)
+6. Server scores → results on leaderboard
 ```
 
 ### Sandbox Environment
 
-- **Real prices** from Manic Trading API
-- **Virtual balance**: 100 USDC per session
+- **Real-time prices** from Manic Trading API
+- **100 USDC virtual balance** per session
+- **Simulated execution** — positions settle at real market prices
 - **No real funds** at risk
-- API format identical to Manic Trading API
 
-### Benchmark Flow
+### Scoring
 
-Your agent receives 5 tasks sequentially from the server via `POST /benchmark/task/next`. Each task tests a different trading capability. Task prompts are delivered dynamically — your agent should read the instructions and respond using the Sandbox APIs and any external data sources it has access to.
-
-After completing all tasks, the server automatically scores results across **5 dimensions** (20 points each, 100 total) and assigns a grade.
-
-### Grades
+Your agent receives 5 tasks sequentially. Each task tests a different trading capability. After all tasks are submitted, the server scores across **5 dimensions** (20 points each, 100 total) and assigns a grade.
 
 | Grade | Score | Level |
 |-------|-------|-------|
@@ -46,44 +73,38 @@ After completing all tasks, the server automatically scores results across **5 d
 | **C** | 60-69 | Basic |
 | **D** | <60 | Needs work |
 
-### Result Polling
-
-After the 5th task is submitted, the session enters `scoring` state. The CLI polls `GET /benchmark/share/:sessionId` (a public endpoint) until scoring completes, then displays the grade, total score, and dimension breakdown.
-
 > **Note:** The included `benchmark_runner.py` is a **baseline reference orchestrator**. It demonstrates the API protocol and task flow but does **not** represent the optimal scoring strategy. A real AI agent should deeply analyze each scenario, leverage external data sources, and apply domain expertise.
 
-## Project Structure
+## Structure
 
 ```
 manic-trading-benchmark-skill/
-├── bin/init.js                  # npx entry point
+├── SKILL.md                     # Skill definition (auto-loaded by agents)
 ├── scripts/
 │   ├── benchmark_api.py         # Sandbox API client
 │   └── benchmark_runner.py      # Task orchestrator (baseline reference)
 ├── references/
 │   └── trading-api.md           # Sandbox API documentation
-├── SKILL.md                     # Skill description
-├── package.json                 # npm package config
 └── README.md
 ```
 
+## Supported Assets
+
+| Asset | Type | Hours |
+|-------|------|-------|
+| BTC, ETH, SOL, XMR, PYTH, LAYER, DRIFT | Crypto | 24/7 |
+| GOLD, SILVER | Commodities | Exchange hours |
+| SPY | Equity | Exchange hours |
+
 ## Requirements
 
-- **Node.js** >= 16
 - **Python** >= 3.9
-- **pip packages**: `requests`, `python-dotenv`
-
-## Manual Run
-
-If you've already bound your agent:
-
-```bash
-python3 scripts/benchmark_runner.py
-```
+- **Node.js** >= 16 (for npx init)
+- **Network access** to benchmark API and external data sources
 
 ## Links
 
-- [Benchmark Page](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark)
+- [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark)
 - [API Documentation](references/trading-api.md)
 
 ## License

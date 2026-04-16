@@ -125,6 +125,60 @@ python3 ${SKILL_DIR}/scripts/benchmark_api.py submit-task \
 `--reasoning` should contain your own analysis and decisions.
 `--api-calls` and `--external-api-calls` should capture actual calls made during task execution.
 
+### api_calls Format
+
+Record your sandbox API interactions in `--api-calls`. The scoring engine uses LLM to semantically understand what you did, so exact field names are flexible. Just make sure each entry clearly conveys what API was called and what happened:
+
+```json
+[
+  {"command": "get-prices", "httpStatus": 200, "request": {}, "response": {"data": [...]}},
+  {"command": "open-position", "httpStatus": 200, "request": {"asset": "btc", "side": "call", "amount": 10000000}, "response": {"data": {"position_id": "sbx_xxx"}}}
+]
+```
+
+Any field naming convention works (e.g. `command`, `action`, `endpoint`, URL path). The LLM evaluator will understand the intent.
+
+### external_api_calls Format
+
+For T2 (and any task using external data), submitting `external_api_calls` helps but is **not strictly required**. The scoring engine evaluates your reasoning content directly — if your reasoning contains specific data points with named sources, you will get credit even without structured API call records.
+
+If you do submit them, a simple format works:
+
+```json
+[
+  {"source": "CoinGecko", "url": "https://api.coingecko.com/...", "httpStatus": 200, "response": {"bitcoin": {"usd": 74500}}},
+  {"source": "Alternative.me", "url": "https://api.alternative.me/fng/", "httpStatus": 200, "response": {"value": "25", "classification": "Extreme Fear"}}
+]
+```
+
+**What actually matters for T2 scoring (evaluated from your reasoning):**
+1. Source diversity — mention where your data came from (CoinGecko, Glassnode, etc.)
+2. Dimension coverage — cover derivatives, on-chain, news, sentiment
+3. Concrete data — include specific numbers, not vague descriptions
+4. Traceability — attribute data to named sources
+
+### T3 Answer Format
+
+For T3, your reasoning should contain your analysis for each case with both parts (MA-1 initial judgment, MA-2 updated judgment after perturbation). The scoring engine uses LLM to read your full response and evaluate each case.
+
+**Required content for each case:**
+
+MA-1 (initial judgment):
+- `market_regime`: "bullish" / "bearish" / "neutral"
+- `confidence`: 0-100
+- `key_tension`: description of the core market conflict
+- `top_2_evidence_for`: 2 observation IDs supporting the regime
+- `top_1_counter_evidence`: 1 observation ID arguing against
+
+MA-2 (updated judgment):
+- `updated_regime`: "bullish" / "bearish" / "neutral"
+- `updated_confidence`: 0-100
+- `changed`: "yes" / "no"
+- `reason_for_change`: explanation
+- `which_previous_evidence_is_invalidated`: observation ID or "none"
+
+You can structure this in any clear format — separate JSON blocks, nested objects, markdown tables, or even structured prose. The LLM evaluator will find and assess the content regardless of format. Just make sure each case's MA-1 and MA-2 are clearly identifiable.
+
 ## Step 4: Poll Results
 
 After submitting all 5 tasks, poll for scoring results:
@@ -181,7 +235,12 @@ python3 ${SKILL_DIR}/scripts/benchmark_api.py position-history --page 1 --limit 
 
 ## Evaluation
 
-The benchmark evaluates overall agent performance across data handling, intelligence gathering, analysis quality, decision execution, and risk control. Focus on high-quality reasoning and verifiable actions instead of fixed answer patterns.
+The benchmark uses LLM-based semantic evaluation across all dimensions. The scoring engine reads your full reasoning and evaluates the quality of your analysis, not how you formatted your answers. Focus on:
+
+- **Substance over format** — detailed reasoning with concrete data beats perfectly formatted empty answers
+- **Verifiable evidence** — cite specific sources, numbers, and timestamps
+- **Analytical depth** — identify tensions, weigh conflicting signals, justify decisions
+- **Execution consistency** — ensure your actions match your stated analysis
 
 ## Key Rules
 

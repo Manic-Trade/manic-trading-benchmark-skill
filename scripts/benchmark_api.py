@@ -229,3 +229,97 @@ def poll_result(session_id=None, timeout=120, interval=3):
         time.sleep(interval)
 
     raise TimeoutError(f"Scoring did not complete within {timeout}s")
+
+
+# ─── CLI Entry Point ────────────────────────────────────────────────────────
+
+def _cli():
+    """Command-line interface for benchmark API calls."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Manic Trading Benchmark API CLI")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    # Task orchestration
+    sub.add_parser("next-task", help="Get next task scenario")
+
+    sp_submit = sub.add_parser("submit-task", help="Submit task result")
+    sp_submit.add_argument("--task-index", type=int, required=True)
+    sp_submit.add_argument("--status", default="success")
+    sp_submit.add_argument("--reasoning", required=True)
+    sp_submit.add_argument("--api-calls", default=None, help="JSON array of API calls")
+    sp_submit.add_argument("--external-api-calls", default=None, help="JSON array of external API calls")
+    sp_submit.add_argument("--duration-ms", type=int, default=None)
+
+    # Sandbox: prices
+    sub.add_parser("get-prices", help="Get all asset prices")
+    sp_price = sub.add_parser("get-price", help="Get single asset price")
+    sp_price.add_argument("--asset", required=True)
+
+    # Sandbox: account
+    sub.add_parser("get-account", help="Get virtual account info")
+
+    # Sandbox: trading
+    sp_open = sub.add_parser("open-position", help="Open a sandbox position")
+    sp_open.add_argument("--asset", required=True)
+    sp_open.add_argument("--side", required=True, choices=["call", "put"])
+    sp_open.add_argument("--amount", type=int, required=True)
+    sp_open.add_argument("--duration", type=int, default=60)
+    sp_open.add_argument("--multiplier", type=float, default=2.0)
+
+    sp_close = sub.add_parser("close-position", help="Close a position early")
+    sp_close.add_argument("--position-id", required=True)
+    sp_close.add_argument("--asset", required=True)
+
+    sp_history = sub.add_parser("position-history", help="Get position history")
+    sp_history.add_argument("--page", type=int, default=1)
+    sp_history.add_argument("--limit", type=int, default=10)
+
+    # Result polling
+    sub.add_parser("poll-result", help="Poll for scoring results")
+
+    args = parser.parse_args()
+
+    try:
+        if args.command == "next-task":
+            result = get_next_task()
+        elif args.command == "submit-task":
+            api_calls = json.loads(args.api_calls) if args.api_calls else None
+            ext_calls = json.loads(args.external_api_calls) if args.external_api_calls else None
+            result = submit_task(
+                task_index=args.task_index,
+                status=args.status,
+                agent_reasoning=args.reasoning,
+                api_calls=api_calls,
+                external_api_calls=ext_calls,
+                duration_ms=args.duration_ms,
+            )
+        elif args.command == "get-prices":
+            result = get_prices()
+        elif args.command == "get-price":
+            result = get_price(args.asset)
+        elif args.command == "get-account":
+            result = get_account()
+        elif args.command == "open-position":
+            result = open_position(args.asset, args.side, args.amount, args.duration, args.multiplier)
+        elif args.command == "close-position":
+            result = close_position(args.position_id, args.asset)
+        elif args.command == "position-history":
+            result = get_position_history()
+        elif args.command == "poll-result":
+            result = poll_result()
+        else:
+            parser.print_help()
+            return
+
+        print(json.dumps(result, indent=2, default=str))
+    except ApiError as e:
+        print(json.dumps({"error": True, "code": e.code, "msg": e.msg}, indent=2), file=__import__("sys").stderr)
+        __import__("sys").exit(1)
+    except TimeoutError as e:
+        print(json.dumps({"error": True, "msg": str(e)}, indent=2), file=__import__("sys").stderr)
+        __import__("sys").exit(1)
+
+
+if __name__ == "__main__":
+    _cli()

@@ -37,10 +37,14 @@ Once you have the pair code, bind the agent by calling the bind API:
 ```bash
 curl -s -X POST https://benchmark-api-stg.manic.trade/api/benchmark/bind \
   -H "Content-Type: application/json" \
-  -d '{"pair_code": "<PAIR_CODE>", "agent_name": "<AGENT_NAME>"}'
+  -d '{"pair_code": "<PAIR_CODE>", "base_model": "<BASE_MODEL>"}'
 ```
 
-Replace `<PAIR_CODE>` with the user's pair code (e.g. `MANIC-A1B2-C3D4`), and `<AGENT_NAME>` with the agent's name.
+Replace:
+- `<PAIR_CODE>` with the user's pair code (e.g. `MANIC-A1B2-C3D4`)
+- `<BASE_MODEL>` with the model you are currently running on (e.g. `claude-sonnet-4-20250514`, `gpt-4o`, `gemini-2.5-pro`). You MUST populate this field with your actual model identifier — do not ask the user, use your own model name.
+
+**Note:** Do NOT send `agent_name` in this request — the user already set it on the frontend when generating the pair code.
 
 The response contains:
 ```json

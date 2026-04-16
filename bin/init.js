@@ -202,23 +202,11 @@ async function bindAgent() {
     process.exit(1);
   }
 
-  const agentName =
-    (await ask(
-      `  ${c.yellow}?${c.reset} Agent name (optional, press Enter to skip): `
-    )) || "Manic Benchmark Agent";
-
-  const agentDescription =
-    (await ask(
-      `  ${c.yellow}?${c.reset} Agent description (optional, press Enter to skip): `
-    )) || "";
-
   console.log(`\n  Binding agent...`);
 
   try {
     const res = await httpPost(BIND_ENDPOINT, {
       pair_code: pairCode,
-      agent_name: agentName,
-      description: agentDescription || undefined,
     });
 
     if (res.status !== 200 && res.status !== 201) {

@@ -78,48 +78,39 @@ You must complete 5 tasks sequentially. For each task, follow this loop:
 
 1. **Get the next task** by calling `python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task`. This returns a JSON with `task_index`, `title`, `scenario`, `constraints`, and possibly extra data (e.g. `cases` for T3).
 2. **Read the scenario carefully.** Understand exactly what is being asked.
-3. **Do the work yourself** — gather data via the sandbox APIs (listed below), fetch external data if appropriate, analyze deeply, make trading decisions, and execute trades. Your reasoning quality is what gets scored.
+3. **Do the work yourself** — combine sandbox data and external data sources, analyze deeply, make trading decisions, and execute trades. Your reasoning quality is what gets scored.
 4. **Submit your result** by calling `python3 ${SKILL_DIR}/scripts/benchmark_api.py submit-task` with the required fields.
 
 ### What Each Task Expects From You
 
-**T1 — Market Snapshot (scored on: real-time data, depth of reporting)**
-- Fetch prices for ALL available assets using the sandbox API
-- Present a comprehensive market snapshot with prices, spreads, and cross-asset observations
-- The more thorough and accurate your data retrieval and presentation, the higher the score
+**T1 — Market Snapshot**
+- Build a market snapshot using sandbox prices plus relevant external context when useful (e.g. volume, market cap, major venue data).
+- Handle ambiguous assets explicitly if they cannot be resolved confidently.
 
-**T2 — Multi-source Intelligence (scored on: breadth of sources, analysis depth)**
-- Gather BTC intelligence from MULTIPLE external sources (CoinGecko, Fear & Greed Index, news APIs, on-chain data, etc.)
-- For each data point, cite the source and timestamp
-- Cross-reference sandbox prices with external sources
-- Provide overall direction (bullish/bearish/neutral), confidence (1-10), and a trading recommendation
-- **Breadth and depth of external data gathering directly impacts your score**
+**T2 — Multi-source Intelligence**
+- Gather BTC-relevant intelligence from multiple external sources and cross-check with sandbox context.
+- Keep the response traceable: include source and time context for key facts.
+- Prefer source diversity (different provider types) and resilient evidence (not a single fragile endpoint).
+- Synthesize collected evidence into a directional view and risk-aware recommendation.
 
-**T3 — Market Analysis (scored on: analytical reasoning quality)**
-- You will receive market cases with observations and a perturbation
-- For each case, produce TWO JSON responses:
-  - **MA-1**: Analyze the market packet → `{"market_regime", "confidence", "key_tension", "top_2_evidence_for", "top_1_counter_evidence", "analysis_summary"}`
-  - **MA-2**: React to new information → `{"updated_regime", "updated_confidence", "changed", "reason_for_change", "which_previous_evidence_is_invalidated"}`
-- Do NOT use external data for T3 — analyze ONLY the provided observations
-- Evidence IDs must reference actual observation IDs from the market packet
+**T3 — Market Analysis**
+- Analyze only the provided case packet and perturbation.
+- Return valid machine-readable outputs for each case and both parts.
+- Reference evidence IDs from the provided observations.
 
-**T4 — Trading Decision & Execution (scored on: decision quality, execution accuracy)**
-- Formulate a trading thesis based on your analysis from T1-T2
-- Decide: asset, direction (call/put), amount (5-20 USDC), duration, multiplier
-- Check the current price, then execute using `open-position`
-- Report: tx_hash, position_id, opening price, and confirm parameters match your plan
-- Decision quality matters more than whether the trade wins
+**T4 — Trading Decision & Execution**
+- Form a concrete trade plan from prior context.
+- Verify market price, execute with sandbox APIs, and report execution artifacts.
+- Ensure the executed parameters match the plan.
 
-**T5 — Risk Management (scored on: risk reasoning, correct action)**
-- Query your position history — the server injects risk-test positions for you
-- For each active position: fetch current price, calculate unrealized P&L
-- Decide HOLD or CLOSE for each, and execute your decision
-- Explain your loss threshold and what signal would change your mind
-- **Hint: closing a losing position and holding a winning one demonstrates good risk management**
+**T5 — Risk Management**
+- Evaluate active positions with current prices and unrealized PnL context.
+- Make and execute explicit HOLD/CLOSE decisions.
+- Explain your risk threshold and what signal would invalidate your current view.
 
 ### Submitting Each Task
 
-After completing your analysis/actions for a task, submit using:
+After completing each task, submit:
 
 ```bash
 python3 ${SKILL_DIR}/scripts/benchmark_api.py submit-task \
@@ -131,17 +122,8 @@ python3 ${SKILL_DIR}/scripts/benchmark_api.py submit-task \
   --duration-ms <TIME_SPENT_MS>
 ```
 
-The `--reasoning` field is your main output — this is what gets scored by the LLM judge. Make it thorough, structured, and insightful.
-
-The `--api-calls` field should record each sandbox API call you made, as a JSON array:
-```json
-[{"command": "get-prices", "httpStatus": 200, "response": {...}, "requestMs": 123}]
-```
-
-The `--external-api-calls` field (T2 only) records external API calls:
-```json
-[{"source": "coingecko", "url": "https://...", "httpStatus": 200, "requestMs": 456, "response": {...}}]
-```
+`--reasoning` should contain your own analysis and decisions.
+`--api-calls` and `--external-api-calls` should capture actual calls made during task execution.
 
 ## Step 4: Poll Results
 
@@ -197,28 +179,16 @@ python3 ${SKILL_DIR}/scripts/benchmark_api.py close-position \
 python3 ${SKILL_DIR}/scripts/benchmark_api.py position-history --page 1 --limit 10
 ```
 
-## Scoring
+## Evaluation
 
-| Grade | Score | Level |
-|-------|-------|-------|
-| **S** | 90-100 | Elite |
-| **A** | 80-89 | Strong |
-| **B** | 70-79 | Solid |
-| **C** | 60-69 | Basic |
-| **D** | <60 | Needs work |
-
-5 dimensions × 20 points each = 100 total. Each task is scored in two parts:
-- **Part A (rule-based, up to 8 points):** Did you call the right APIs, return valid JSON, reference correct observation IDs, etc.
-- **Part B (LLM-judged, up to 12 points):** Quality of reasoning, depth of analysis, sophistication of approach.
-
-**Your reasoning quality is the primary differentiator between a D and an S grade.**
+The benchmark evaluates overall agent performance across data handling, intelligence gathering, analysis quality, decision execution, and risk control. Focus on high-quality reasoning and verifiable actions instead of fixed answer patterns.
 
 ## Key Rules
 
 - **Amount is in base units.** USDC has 6 decimals: 1000000 = 1 USDC, 10000000 = 10 USDC.
 - **Side meaning.** `call` = bullish (up), `put` = bearish (down).
 - **Durations.** 30, 60, 120, 180, 240, 300 seconds.
-- **Sandbox only.** Virtual 100 USDC balance, no real funds at risk.
+- **Trading execution is sandboxed.** Virtual 100 USDC balance, no real funds at risk; research data can come from sandbox and external sources.
 
 ## Supported Assets
 

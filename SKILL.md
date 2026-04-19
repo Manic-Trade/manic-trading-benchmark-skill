@@ -23,19 +23,24 @@ Use this skill when the user asks to:
 
 Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_PAIR_CODE`.
 
-**If `.env` is missing or does not contain `BENCHMARK_PAIR_CODE`:** the skill is not yet installed. Tell the user:
+**Path A — No pair code yet (`.env` missing or no `BENCHMARK_PAIR_CODE`):**
 
-> The benchmark skill is not set up yet. Please run:
-> ```
-> npx manic-trading-benchmark
-> ```
-> This will install the skill files and save your pair code. If you don't have a pair code yet, go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in your Bot Name, and copy the pair code.
+Do NOT tell the user to run any commands. Instead, directly ask:
 
-Stop here and wait for the user to complete setup.
+> Please provide your pair code (format: `MANIC-XXXX-XXXX`).
+> If you don't have one yet, go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in your Bot Name, and copy the pair code.
 
-**If `BENCHMARK_PAIR_CODE` exists:** check if there is also a valid `BENCHMARK_API_KEY` in `.env`.
+Once the user provides the pair code:
+1. Create `${SKILL_DIR}/.env` with this content:
+```
+# Manic Trading Benchmark Configuration
+BENCHMARK_PAIR_CODE=<pair code from user>
+BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
+```
+2. Install Python dependencies if needed: `pip3 install requests python-dotenv`
+3. Immediately proceed to **Bind and Start** below (do NOT ask the user for any extra confirmation — they already expressed intent to run by providing the pair code).
 
-### Case A: `BENCHMARK_API_KEY` exists
+**Path B — Pair code exists, API key exists (`BENCHMARK_API_KEY` is set):**
 
 Probe the session status:
 
@@ -43,25 +48,25 @@ Probe the session status:
 python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task
 ```
 
-- If the call **succeeds** (returns a task) → session is active, skip to Step 2 (Confirm Before Starting).
-- If the call **fails with HTTP 401 or `code: 1102`** → the previous session is finished or the key is invalid. Go to **Bind Flow** below.
+- If the call **succeeds** (returns a task) → session is active, skip to Step 1 (Confirm Before Starting).
+- If the call **fails with HTTP 401 or `code: 1102`** → the previous session is finished or the key is invalid. Ask the user:
+  > Your previous benchmark session has ended. Would you like to start a new round? [Y/n]
+  - If yes → proceed to **Bind and Start**.
+  - If no → stop.
 - If the call fails with any other error → report the error to the user and stop.
 
-### Case B: No `BENCHMARK_API_KEY`
+**Path C — Pair code exists, no API key:**
 
-This is either a fresh setup or a previous session was completed. Go to **Bind Flow** below.
+This is either a fresh setup or a previous session was completed. Ask the user:
 
-### Bind Flow
+> Ready to start a benchmark session. Would you like to proceed? [Y/n]
 
-Inform the user that a new benchmark session is needed and ask for confirmation:
+- If yes → proceed to **Bind and Start**.
+- If no → stop.
 
-> The previous benchmark session has ended (or this is the first run). Would you like to start a new benchmark round? [Y/n]
+### Bind and Start
 
-If the user declines, stop.
-
-If the user confirms:
-
-1. **Determine your base_model value:** You must identify the exact model ID you are running on right now. Introspect your own model — do NOT ask the user, do NOT guess, do NOT use a generic name. Use your precise model identifier (e.g. `claude-opus-4-6`, `claude-sonnet-4-20250514`, `gpt-4o-2024-08-06`).
+1. **Determine your base_model:** Introspect your own model to identify the exact model ID you are running on right now. Do NOT ask the user, do NOT guess, do NOT use a generic name. Use your precise model identifier (e.g. `claude-opus-4-6`, `claude-sonnet-4-20250514`, `gpt-4o-2024-08-06`).
 
 2. **Read the pair code** from `${SKILL_DIR}/.env` (`BENCHMARK_PAIR_CODE` value).
 
@@ -73,10 +78,10 @@ curl -s -X POST https://benchmark-api-stg.manic.trade/api/benchmark/bind \
   -d "{\"pair_code\": \"PAIR_CODE_FROM_ENV\", \"base_model\": \"YOUR_MODEL_ID_HERE\"}"
 ```
 
-**STRICT RULES for this request:**
+**STRICT RULES:**
 - Replace `PAIR_CODE_FROM_ENV` with the pair code read from `.env`
 - Replace `YOUR_MODEL_ID_HERE` with your actual model ID (determined above)
-- The request body must contain ONLY `pair_code` and `base_model` — nothing else
+- The request body must contain ONLY `pair_code` and `base_model`
 - Do NOT add `agent_name`, `description`, or any other fields
 
 4. **Handle the response:**
@@ -89,7 +94,7 @@ curl -s -X POST https://benchmark-api-stg.manic.trade/api/benchmark/bind \
 
 - If the response succeeds, extract `api_key`, `sandbox_base_url`, and `binding_id` from `data`.
 
-5. **Update `${SKILL_DIR}/.env`** — overwrite the file but **preserve `BENCHMARK_PAIR_CODE` and `BENCHMARK_SERVER_BASE`**:
+5. **Update `${SKILL_DIR}/.env`** — preserve `BENCHMARK_PAIR_CODE` and `BENCHMARK_SERVER_BASE`, add/overwrite the rest:
 
 ```
 # Manic Trading Benchmark Configuration
@@ -100,18 +105,9 @@ BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
 BENCHMARK_SESSION_ID=<binding_id from response>
 ```
 
-6. Continue to Step 2 (Confirm Before Starting).
+6. Continue to Step 1 (Confirm Before Starting).
 
-## Step 1: Get Pair Code (first-time only)
-
-This step is only needed if `${SKILL_DIR}/.env` does not exist at all. Tell the user:
-
-1. Run `npx manic-trading-benchmark` to install the skill and enter their pair code
-2. If they don't have a pair code, go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in Bot Name, and copy the pair code
-
-After setup is complete, return to the Pre-check flow.
-
-## Step 2: Confirm Before Starting
+## Step 1: Confirm Before Starting
 
 Before executing tasks, inform the user:
 
@@ -121,7 +117,7 @@ Before executing tasks, inform the user:
 
 Ask the user to confirm they want to proceed. Do NOT start tasks without confirmation.
 
-## Step 3: Execute Benchmark Tasks
+## Step 2: Execute Benchmark Tasks
 
 **CRITICAL: Do NOT simply run `benchmark_runner.py`. That script is only a baseline reference. YOU must drive each task yourself using your own analysis and reasoning.**
 
@@ -233,7 +229,7 @@ MA-2 (updated judgment):
 
 You can structure this in any clear format — separate JSON blocks, nested objects, markdown tables, or even structured prose. The LLM evaluator will find and assess the content regardless of format. Just make sure each case's MA-1 and MA-2 are clearly identifiable.
 
-## Step 4: Poll Results
+## Step 3: Poll Results
 
 After submitting all 5 tasks, poll for scoring results:
 

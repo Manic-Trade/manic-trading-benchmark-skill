@@ -3,7 +3,7 @@ name: manic-trading-benchmark-skill
 description: Run a standardized benchmark to evaluate AI trading agent capabilities on the Manic Trade platform. Use this skill when a user wants to benchmark their trading agent, run a trading evaluation, score their AI agent's trading ability, or test trading performance. Covers market data retrieval, intelligence gathering, analysis, trading execution, and risk management across 5 tasks with a virtual 100 USDC balance and real-time prices.
 metadata:
   author: Manic-Trade
-  version: "1.0.0"
+  version: "1.1.0"
   platform: manic.trade
   chain: solana
 ---
@@ -21,76 +21,97 @@ Use this skill when the user asks to:
 
 ## Pre-check: Verify Setup
 
-Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_API_KEY`.
+Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_PAIR_CODE`.
 
-**If `.env` is missing or does not contain `BENCHMARK_API_KEY`:** the agent is not yet paired. Proceed with Step 1.
+**If `.env` is missing or does not contain `BENCHMARK_PAIR_CODE`:** the skill is not yet installed. Tell the user:
 
-**If `BENCHMARK_API_KEY` exists:** probe the session status immediately by calling:
+> The benchmark skill is not set up yet. Please run:
+> ```
+> npx manic-trading-benchmark
+> ```
+> This will install the skill files and save your pair code. If you don't have a pair code yet, go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in your Bot Name, and copy the pair code.
+
+Stop here and wait for the user to complete setup.
+
+**If `BENCHMARK_PAIR_CODE` exists:** check if there is also a valid `BENCHMARK_API_KEY` in `.env`.
+
+### Case A: `BENCHMARK_API_KEY` exists
+
+Probe the session status:
 
 ```bash
 python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task
 ```
 
-- If the call **succeeds** (returns a task) → session is active, skip to Step 3.
-- If the call **fails with `code: 1102`** (`Session status "completed" does not allow API access`) → the previous session is finished. Inform the user:
-
-  > The previous session has ended. You need a new pair code to start a new benchmark round.
-  > Please go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in your Bot Name, and copy the new pair code (format: `MANIC-XXXX-XXXX`).
-
-  Then proceed with Step 1 (get new pair code) → Step 2 (bind again) before continuing.
-
+- If the call **succeeds** (returns a task) → session is active, skip to Step 2 (Confirm Before Starting).
+- If the call **fails with HTTP 401 or `code: 1102`** → the previous session is finished or the key is invalid. Go to **Bind Flow** below.
 - If the call fails with any other error → report the error to the user and stop.
 
-## Step 1: Get Pair Code
+### Case B: No `BENCHMARK_API_KEY`
 
-Before running the benchmark, a **pair code** is required. If the user has not provided one, ask them to:
+This is either a fresh setup or a previous session was completed. Go to **Bind Flow** below.
 
-1. Go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark)
-2. Login with Twitter
-3. Fill in their Bot Name
-4. Copy the pair code (format: `MANIC-XXXX-XXXX`)
+### Bind Flow
 
-Then ask the user to paste the pair code.
+Inform the user that a new benchmark session is needed and ask for confirmation:
 
-## Step 2: Bind Agent
+> The previous benchmark session has ended (or this is the first run). Would you like to start a new benchmark round? [Y/n]
 
-Once you have the pair code, bind the agent by calling the bind API.
+If the user declines, stop.
 
-**Before calling, determine your base_model value:** You must identify the exact model ID you are running on right now. Introspect your own model — do NOT ask the user, do NOT guess, do NOT use a generic name. Use your precise model identifier (e.g. `claude-opus-4-6`, `claude-sonnet-4-20250514`, `gpt-4o-2024-08-06`).
+If the user confirms:
+
+1. **Determine your base_model value:** You must identify the exact model ID you are running on right now. Introspect your own model — do NOT ask the user, do NOT guess, do NOT use a generic name. Use your precise model identifier (e.g. `claude-opus-4-6`, `claude-sonnet-4-20250514`, `gpt-4o-2024-08-06`).
+
+2. **Read the pair code** from `${SKILL_DIR}/.env` (`BENCHMARK_PAIR_CODE` value).
+
+3. **Call the bind API:**
 
 ```bash
 curl -s -X POST https://benchmark-api-stg.manic.trade/api/benchmark/bind \
   -H "Content-Type: application/json" \
-  -d "{\"pair_code\": \"PAIR_CODE_HERE\", \"base_model\": \"YOUR_MODEL_ID_HERE\"}"
+  -d "{\"pair_code\": \"PAIR_CODE_FROM_ENV\", \"base_model\": \"YOUR_MODEL_ID_HERE\"}"
 ```
 
 **STRICT RULES for this request:**
-- Replace `PAIR_CODE_HERE` with the user's pair code
+- Replace `PAIR_CODE_FROM_ENV` with the pair code read from `.env`
 - Replace `YOUR_MODEL_ID_HERE` with your actual model ID (determined above)
 - The request body must contain ONLY `pair_code` and `base_model` — nothing else
-- Do NOT add `agent_name`, `description`, or any other fields — the user already set agent_name on the frontend
+- Do NOT add `agent_name`, `description`, or any other fields
 
-The response contains:
-```json
-{
-  "data": {
-    "binding_id": "123456789",
-    "api_key": "bk-abc123def456...",
-    "sandbox_base_url": "https://benchmark-api-stg.manic.trade/api/agent"
-  }
-}
+4. **Handle the response:**
+
+- If the response contains `code: 2003` (`MAX_ATTEMPTS_REACHED`) → inform the user:
+  > You've used all your benchmark attempts. Share your results on Twitter to earn +1 extra attempt!
+  > Go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark) to share.
+
+  Stop here.
+
+- If the response succeeds, extract `api_key`, `sandbox_base_url`, and `binding_id` from `data`.
+
+5. **Update `${SKILL_DIR}/.env`** — overwrite the file but **preserve `BENCHMARK_PAIR_CODE` and `BENCHMARK_SERVER_BASE`**:
+
 ```
-
-Save `api_key` and `binding_id` from the response. Write them to `${SKILL_DIR}/.env`:
-
-```
+# Manic Trading Benchmark Configuration
+BENCHMARK_PAIR_CODE=<keep existing value>
 BENCHMARK_API_KEY=<api_key from response>
 BENCHMARK_API_BASE=<sandbox_base_url from response>
 BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
 BENCHMARK_SESSION_ID=<binding_id from response>
 ```
 
-## Step 3: Confirm Before Starting
+6. Continue to Step 2 (Confirm Before Starting).
+
+## Step 1: Get Pair Code (first-time only)
+
+This step is only needed if `${SKILL_DIR}/.env` does not exist at all. Tell the user:
+
+1. Run `npx manic-trading-benchmark` to install the skill and enter their pair code
+2. If they don't have a pair code, go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in Bot Name, and copy the pair code
+
+After setup is complete, return to the Pre-check flow.
+
+## Step 2: Confirm Before Starting
 
 Before executing tasks, inform the user:
 
@@ -100,7 +121,7 @@ Before executing tasks, inform the user:
 
 Ask the user to confirm they want to proceed. Do NOT start tasks without confirmation.
 
-## Step 4: Execute Benchmark Tasks
+## Step 3: Execute Benchmark Tasks
 
 **CRITICAL: Do NOT simply run `benchmark_runner.py`. That script is only a baseline reference. YOU must drive each task yourself using your own analysis and reasoning.**
 
@@ -212,7 +233,7 @@ MA-2 (updated judgment):
 
 You can structure this in any clear format — separate JSON blocks, nested objects, markdown tables, or even structured prose. The LLM evaluator will find and assess the content regardless of format. Just make sure each case's MA-1 and MA-2 are clearly identifiable.
 
-## Step 5: Poll Results
+## Step 4: Poll Results
 
 After submitting all 5 tasks, poll for scoring results:
 

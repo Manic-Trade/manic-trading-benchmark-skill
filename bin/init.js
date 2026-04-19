@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 
-const { execSync, spawn } = require("child_process");
+const { execSync } = require("child_process");
 const readline = require("readline");
 const path = require("path");
 const fs = require("fs");
-const https = require("https");
-const http = require("http");
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BENCHMARK_API_BASE = "https://benchmark-api-stg.manic.trade";
-const BIND_ENDPOINT = `${BENCHMARK_API_BASE}/api/benchmark/bind`;
+const BENCHMARK_SERVER_BASE = "https://benchmark-api-stg.manic.trade";
 const MIN_PYTHON_VERSION = [3, 9];
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
@@ -23,11 +20,7 @@ const c = {
   green: "\x1b[32m",
   yellow: "\x1b[33m",
   blue: "\x1b[34m",
-  magenta: "\x1b[35m",
   cyan: "\x1b[36m",
-  white: "\x1b[37m",
-  bgBlue: "\x1b[44m",
-  bgGreen: "\x1b[42m",
 };
 
 function banner() {
@@ -58,45 +51,10 @@ function ask(question) {
   });
 }
 
-function httpPost(url, body) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(body);
-    const parsed = new URL(url);
-    const mod = parsed.protocol === "https:" ? https : http;
-
-    const req = mod.request(
-      {
-        hostname: parsed.hostname,
-        port: parsed.port,
-        path: parsed.pathname + parsed.search,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(data),
-        },
-      },
-      (res) => {
-        let body = "";
-        res.on("data", (chunk) => (body += chunk));
-        res.on("end", () => {
-          try {
-            resolve({ status: res.statusCode, data: JSON.parse(body) });
-          } catch {
-            resolve({ status: res.statusCode, data: body });
-          }
-        });
-      }
-    );
-    req.on("error", reject);
-    req.write(data);
-    req.end();
-  });
-}
-
 // ─── Step 1: Check Python ────────────────────────────────────────────────────
 
 function checkPython() {
-  console.log(`${c.blue}[1/4]${c.reset} Checking Python environment...`);
+  console.log(`${c.blue}[1/3]${c.reset} Checking Python environment...`);
 
   const candidates = ["python3", "python"];
   for (const cmd of candidates) {
@@ -132,7 +90,7 @@ function checkPython() {
 
 function installSkillFiles() {
   console.log(
-    `${c.blue}[2/4]${c.reset} Installing benchmark skill files...`
+    `${c.blue}[2/3]${c.reset} Installing benchmark skill files...`
   );
 
   const pkgRoot = path.resolve(__dirname, "..");
@@ -178,12 +136,26 @@ function installSkillFiles() {
   }
 }
 
-// ─── Step 3: Pair Code Binding ───────────────────────────────────────────────
+// ─── Step 3: Save Pair Code ──────────────────────────────────────────────────
 
-async function bindAgent() {
+async function savePairCode() {
   console.log(
-    `\n${c.blue}[3/4]${c.reset} Agent binding`
+    `\n${c.blue}[3/3]${c.reset} Pair code setup`
   );
+
+  const envPath = path.join(process.cwd(), ".env");
+
+  // Check if .env already has a pair code
+  if (fs.existsSync(envPath)) {
+    const existing = fs.readFileSync(envPath, "utf-8");
+    const match = existing.match(/^BENCHMARK_PAIR_CODE=(MANIC-[A-Z0-9]{4}-[A-Z0-9]{4})$/m);
+    if (match) {
+      console.log(`  ${c.green}✓${c.reset} Pair code already configured: ${c.dim}${match[1]}${c.reset}`);
+      console.log(`\n  ${c.green}Setup complete!${c.reset} Your AI agent will handle binding automatically when you start a benchmark run.\n`);
+      return;
+    }
+  }
+
   console.log(
     `\n  ${c.dim}Get your pair code from: ${c.cyan}https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark${c.reset}`
   );
@@ -202,126 +174,18 @@ async function bindAgent() {
     process.exit(1);
   }
 
-  console.log(`\n  Binding agent...`);
+  const envContent = [
+    `# Manic Trading Benchmark Configuration`,
+    `# Generated at ${new Date().toISOString()}`,
+    `BENCHMARK_PAIR_CODE=${pairCode}`,
+    `BENCHMARK_SERVER_BASE=${BENCHMARK_SERVER_BASE}`,
+    "",
+  ].join("\n");
 
-  try {
-    const res = await httpPost(BIND_ENDPOINT, {
-      pair_code: pairCode,
-    });
+  fs.writeFileSync(envPath, envContent);
 
-    if (res.status !== 200 && res.status !== 201) {
-      const msg =
-        res.data?.msg || res.data?.error || JSON.stringify(res.data);
-      console.error(`\n  ${c.red}✗ Binding failed (HTTP ${res.status}): ${msg}${c.reset}\n`);
-      process.exit(1);
-    }
-
-    // Server returns { code, msg, data } — check business error
-    const body = res.data || {};
-    if (typeof body.code === "number" && body.code !== 0) {
-      console.error(
-        `\n  ${c.red}✗ Binding failed: ${body.msg || "Unknown error"} (code ${body.code})${c.reset}\n`
-      );
-      process.exit(1);
-    }
-
-    const payload = body.data || body;
-    const apiKey = payload.api_key;
-    const sandboxBaseUrl = payload.sandbox_base_url || `${BENCHMARK_API_BASE}/api/agent`;
-    const sessionId = payload.binding_id || "";
-
-    if (!apiKey) {
-      console.error(
-        `\n  ${c.red}✗ No API key returned from server.${c.reset}\n`
-      );
-      console.error(`  Response: ${JSON.stringify(res.data, null, 2)}\n`);
-      process.exit(1);
-    }
-
-    // Write .env
-    const envPath = path.join(process.cwd(), ".env");
-    const envContent = [
-      `# Manic Trading Benchmark Configuration`,
-      `# Generated at ${new Date().toISOString()}`,
-      `BENCHMARK_API_KEY=${apiKey}`,
-      `BENCHMARK_API_BASE=${sandboxBaseUrl}`,
-      `BENCHMARK_SERVER_BASE=${BENCHMARK_API_BASE}`,
-      `BENCHMARK_SESSION_ID=${sessionId}`,
-      "",
-    ].join("\n");
-
-    fs.writeFileSync(envPath, envContent);
-
-    console.log(`  ${c.green}✓${c.reset} Agent bound successfully!`);
-    console.log(`  ${c.green}✓${c.reset} API key saved to .env`);
-    console.log(
-      `  ${c.dim}  Key: ${apiKey.substring(0, 10)}...${c.reset}`
-    );
-
-    return { apiKey, sandboxBaseUrl };
-  } catch (err) {
-    console.error(
-      `\n  ${c.red}✗ Network error: ${err.message}${c.reset}\n`
-    );
-    process.exit(1);
-  }
-}
-
-// ─── Step 4: Run Benchmark ───────────────────────────────────────────────────
-
-async function runBenchmark(pythonCmd) {
-  console.log(
-    `\n${c.blue}[4/4]${c.reset} Ready to start benchmark`
-  );
-  console.log(`
-  ${c.bold}The benchmark will evaluate your agent across 5 tasks:${c.reset}
-  ${c.dim}┌─────────────────────────────────────────────────┐
-  │  T1  Market Snapshot        (~30s)  📊          │
-  │  T2  Multi-source Intel     (~60s)  🔍          │
-  │  T3  Market Analysis        (~90s)  🧠          │
-  │  T4  Trading Decision       (~30s)  💹          │
-  │  T5  Risk Management        (~60s)  🛡️           │
-  └─────────────────────────────────────────────────┘${c.reset}
-  ${c.dim}Total estimated time: ~5 minutes${c.reset}
-`);
-
-  const confirm = await ask(
-    `  ${c.yellow}?${c.reset} Start the benchmark now? ${c.dim}[Y/n]${c.reset} `
-  );
-
-  if (confirm.toLowerCase() === "n") {
-    console.log(
-      `\n  ${c.dim}You can start the benchmark later by running:${c.reset}`
-    );
-    console.log(
-      `  ${c.cyan}${pythonCmd} scripts/benchmark_runner.py${c.reset}\n`
-    );
-    process.exit(0);
-  }
-
-  console.log(`\n  ${c.green}Starting benchmark...${c.reset}\n`);
-
-  const runnerPath = path.join(process.cwd(), "scripts", "benchmark_runner.py");
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(pythonCmd, [runnerPath], {
-      cwd: process.cwd(),
-      stdio: "inherit",
-      env: { ...process.env },
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`Benchmark runner exited with code ${code}`));
-      }
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-  });
+  console.log(`  ${c.green}✓${c.reset} Pair code saved to .env`);
+  console.log(`\n  ${c.green}Setup complete!${c.reset} Your AI agent will handle binding automatically when you start a benchmark run.\n`);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -329,16 +193,9 @@ async function runBenchmark(pythonCmd) {
 async function main() {
   banner();
 
-  const pythonCmd = checkPython();
+  checkPython();
   installSkillFiles();
-  await bindAgent();
-
-  try {
-    await runBenchmark(pythonCmd);
-  } catch (err) {
-    console.error(`\n  ${c.red}✗ Benchmark failed: ${err.message}${c.reset}\n`);
-    process.exit(1);
-  }
+  await savePairCode();
 }
 
 main().catch((err) => {

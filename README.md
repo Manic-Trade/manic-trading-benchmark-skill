@@ -37,7 +37,7 @@ This will:
 
 ## Usage
 
-After binding, the init script will ask if you want to start immediately. You can also run it later:
+After binding, ask your AI agent to run the Manic Trading Benchmark. The agent will read SKILL.md and drive each task autonomously. You can also run the baseline reference runner directly:
 
 ```bash
 python3 scripts/benchmark_runner.py
@@ -50,8 +50,9 @@ python3 scripts/benchmark_runner.py
 2. Get pair code (MANIC-XXXX-XXXX)
 3. Run: npx manic-trading-benchmark init
 4. Enter pair code → agent binds → gets API key
-5. Confirm to start → 5 tasks execute (~5 min)
-6. Server scores → results on leaderboard
+5. Review estimated duration (~5 min) & token usage (~50K-100K)
+6. Confirm to start → Agent drives 5 tasks autonomously
+7. Server scores → results on leaderboard
 ```
 
 ### Sandbox Environment

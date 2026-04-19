@@ -19,6 +19,12 @@ Use this skill when the user asks to:
 - Run a trading capability test or score
 - Test trading performance on Manic
 
+## Pre-check: Verify Setup
+
+Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_API_KEY`. If it does, the agent is already paired — skip to Step 3.
+
+If `.env` is missing or does not contain `BENCHMARK_API_KEY`, the agent is not yet paired. Proceed with Step 1.
+
 ## Step 1: Get Pair Code
 
 Before running the benchmark, a **pair code** is required. If the user has not provided one, ask them to:
@@ -68,7 +74,17 @@ BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
 BENCHMARK_SESSION_ID=<binding_id from response>
 ```
 
-## Step 3: Execute Benchmark Tasks
+## Step 3: Confirm Before Starting
+
+Before executing tasks, inform the user:
+
+- **Estimated duration**: ~5 minutes (5 tasks)
+- **Estimated token usage**: ~50K-100K tokens depending on model and external data fetching
+- **What will happen**: 5 sequential trading tasks covering market data, intelligence, analysis, execution, and risk management
+
+Ask the user to confirm they want to proceed. Do NOT start tasks without confirmation.
+
+## Step 4: Execute Benchmark Tasks
 
 **CRITICAL: Do NOT simply run `benchmark_runner.py`. That script is only a baseline reference. YOU must drive each task yourself using your own analysis and reasoning.**
 
@@ -84,7 +100,8 @@ You must complete 5 tasks sequentially. For each task, follow this loop:
 ### What Each Task Expects From You
 
 **T1 — Market Snapshot**
-- Build a market snapshot using sandbox prices plus relevant external context when useful (e.g. volume, market cap, major venue data).
+- Build a comprehensive market snapshot for the requested assets on your own.
+- Cite your data sources and include timestamps.
 - Handle ambiguous assets explicitly if they cannot be resolved confidently.
 
 **T2 — Multi-source Intelligence**
@@ -179,7 +196,7 @@ MA-2 (updated judgment):
 
 You can structure this in any clear format — separate JSON blocks, nested objects, markdown tables, or even structured prose. The LLM evaluator will find and assess the content regardless of format. Just make sure each case's MA-1 and MA-2 are clearly identifiable.
 
-## Step 4: Poll Results
+## Step 5: Poll Results
 
 After submitting all 5 tasks, poll for scoring results:
 

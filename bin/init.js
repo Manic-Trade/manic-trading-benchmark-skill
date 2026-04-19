@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { execSync, spawn } = require("child_process");
+const { execSync } = require("child_process");
 const readline = require("readline");
 const path = require("path");
 const fs = require("fs");
@@ -267,13 +267,15 @@ async function bindAgent() {
   }
 }
 
-// ─── Step 4: Run Benchmark ───────────────────────────────────────────────────
+// ─── Step 4: Show Confirmation ───────────────────────────────────────────────
 
-async function runBenchmark(pythonCmd) {
+function showConfirmation() {
   console.log(
-    `\n${c.blue}[4/4]${c.reset} Ready to start benchmark`
+    `\n${c.blue}[4/4]${c.reset} Setup complete!`
   );
   console.log(`
+  ${c.green}${c.bold}✓ Agent bound and ready to benchmark.${c.reset}
+
   ${c.bold}The benchmark will evaluate your agent across 5 tasks:${c.reset}
   ${c.dim}┌─────────────────────────────────────────────────┐
   │  T1  Market Snapshot        (~30s)  📊          │
@@ -282,46 +284,13 @@ async function runBenchmark(pythonCmd) {
   │  T4  Trading Decision       (~30s)  💹          │
   │  T5  Risk Management        (~60s)  🛡️           │
   └─────────────────────────────────────────────────┘${c.reset}
-  ${c.dim}Total estimated time: ~5 minutes${c.reset}
+
+  ${c.bold}Estimated duration :${c.reset} ~5 minutes
+  ${c.bold}Estimated tokens   :${c.reset} ~50K–100K tokens (varies by model)
+
+  ${c.cyan}${c.bold}Next step:${c.reset} Ask your AI agent to run the Manic Trading Benchmark.
+  ${c.dim}The agent will read SKILL.md and drive each task autonomously.${c.reset}
 `);
-
-  const confirm = await ask(
-    `  ${c.yellow}?${c.reset} Start the benchmark now? ${c.dim}[Y/n]${c.reset} `
-  );
-
-  if (confirm.toLowerCase() === "n") {
-    console.log(
-      `\n  ${c.dim}You can start the benchmark later by running:${c.reset}`
-    );
-    console.log(
-      `  ${c.cyan}${pythonCmd} scripts/benchmark_runner.py${c.reset}\n`
-    );
-    process.exit(0);
-  }
-
-  console.log(`\n  ${c.green}Starting benchmark...${c.reset}\n`);
-
-  const runnerPath = path.join(process.cwd(), "scripts", "benchmark_runner.py");
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(pythonCmd, [runnerPath], {
-      cwd: process.cwd(),
-      stdio: "inherit",
-      env: { ...process.env },
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`Benchmark runner exited with code ${code}`));
-      }
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-  });
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -332,13 +301,7 @@ async function main() {
   const pythonCmd = checkPython();
   installSkillFiles();
   await bindAgent();
-
-  try {
-    await runBenchmark(pythonCmd);
-  } catch (err) {
-    console.error(`\n  ${c.red}✗ Benchmark failed: ${err.message}${c.reset}\n`);
-    process.exit(1);
-  }
+  showConfirmation();
 }
 
 main().catch((err) => {

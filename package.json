@@ -5,6 +5,9 @@
   "bin": {
     "manic-trading-benchmark": "./bin/init.js"
   },
+  "scripts": {
+    "postinstall": "node bin/postinstall.js"
+  },
   "files": [
     "bin/",
     "scripts/",

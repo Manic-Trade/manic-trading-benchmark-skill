@@ -436,30 +436,38 @@ def execute_task(task_index, task_data, context):
     reasoning_parts = []
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # ── Always gather baseline market data ──
-    prices_data, prices_call = safe_call(api.get_prices, "get-prices")
-    api_calls.append(prices_call)
-
-    account_data, account_call = safe_call(api.get_account, "get-account")
-    api_calls.append(account_call)
-
-    # Parse price list
     price_map = {}
-    if prices_data:
-        price_list = prices_data if isinstance(prices_data, list) else []
-        for item in price_list:
-            asset = (item.get("asset", "")).lower()
-            raw = _to_num(item.get("price", 0))
-            exp = _to_num(item.get("price_exponent", item.get("priceExponent", -8)), -8)
-            price_map[asset] = {"raw": raw, "exponent": exp, "display": format_price(raw, exp)}
 
-    # Format prices for reasoning
-    if price_map:
-        reasoning_parts.append(f"## Market Data (as of {timestamp})\n")
-        reasoning_parts.append("Source: Manic Trade Sandbox API\n")
-        for asset, info in sorted(price_map.items()):
-            reasoning_parts.append(f"- **{asset.upper()}**: ${info['display']:,.2f}")
-        reasoning_parts.append("")
+    if task_index == 0:
+        # ── T1: fetch prices from external sources (not sandbox API) ──
+        t1_reasoning, t1_ext_calls, price_map = _collect_t1_market_data()
+        external_calls.extend(t1_ext_calls)
+        reasoning_parts.extend(t1_reasoning)
+
+        account_data, account_call = safe_call(api.get_account, "get-account")
+        api_calls.append(account_call)
+    else:
+        # ── Non-T1 tasks: gather baseline market data from sandbox ──
+        prices_data, prices_call = safe_call(api.get_prices, "get-prices")
+        api_calls.append(prices_call)
+
+        account_data, account_call = safe_call(api.get_account, "get-account")
+        api_calls.append(account_call)
+
+        if prices_data:
+            price_list = prices_data if isinstance(prices_data, list) else []
+            for item in price_list:
+                asset = (item.get("asset", "")).lower()
+                raw = _to_num(item.get("price", 0))
+                exp = _to_num(item.get("price_exponent", item.get("priceExponent", -8)), -8)
+                price_map[asset] = {"raw": raw, "exponent": exp, "display": format_price(raw, exp)}
+
+        if price_map:
+            reasoning_parts.append(f"## Market Data (as of {timestamp})\n")
+            reasoning_parts.append("Source: Manic Trade Sandbox API\n")
+            for asset, info in sorted(price_map.items()):
+                reasoning_parts.append(f"- **{asset.upper()}**: ${info['display']:,.2f}")
+            reasoning_parts.append("")
 
     # ── Task2 prefers external signals for multi-source scoring ──
     if task_index == 1:
@@ -664,6 +672,81 @@ def _handle_structured_cases(cases):
         results.append({"case_id": case_id, "ma1": ma1, "ma2": ma2})
 
     return results
+
+
+def _collect_t1_market_data():
+    """Fetch market snapshot data from external sources for T1.
+
+    Returns: (reasoning_parts, external_calls, price_map)
+    """
+    reasoning = ["## Market Snapshot\n"]
+    calls = []
+    price_map = {}
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    cg_assets = {
+        "bitcoin": "btc",
+        "ethereum": "eth",
+        "solana": "sol",
+    }
+    cg_ids = ",".join(cg_assets.keys())
+    cg_url = (
+        f"https://api.coingecko.com/api/v3/simple/price"
+        f"?ids={cg_ids}"
+        f"&vs_currencies=usd"
+        f"&include_24hr_change=true"
+        f"&include_24hr_vol=true"
+        f"&include_market_cap=true"
+    )
+
+    start = time.time()
+    try:
+        resp = requests.get(cg_url, timeout=10)
+        ms = int((time.time() - start) * 1000)
+        payload = resp.json()
+        calls.append({
+            "source": "CoinGecko",
+            "url": cg_url,
+            "httpStatus": resp.status_code,
+            "requestMs": ms,
+            "response": payload,
+        })
+
+        reasoning.append(f"Data retrieved at {timestamp} from CoinGecko:\n")
+        for cg_id, symbol in cg_assets.items():
+            data = payload.get(cg_id, {})
+            price = _to_num(data.get("usd"))
+            change = _to_num(data.get("usd_24h_change"))
+            volume = _to_num(data.get("usd_24h_vol"))
+            mcap = _to_num(data.get("usd_market_cap"))
+            if price > 0:
+                price_map[symbol] = {"raw": price, "exponent": 0, "display": price}
+                reasoning.append(f"- **{symbol.upper()}**: ${price:,.2f}")
+                reasoning.append(f"  - 24h change: {change:+.2f}%")
+                reasoning.append(f"  - 24h volume: ${volume:,.0f}")
+                reasoning.append(f"  - Market cap: ${mcap:,.0f}")
+    except Exception as e:
+        ms = int((time.time() - start) * 1000)
+        calls.append({
+            "source": "CoinGecko",
+            "url": cg_url,
+            "httpStatus": 0,
+            "requestMs": ms,
+            "response": {"error": str(e)},
+        })
+        reasoning.append(f"- CoinGecko request failed: {e}")
+
+    reasoning.append("")
+    reasoning.append("### 龙虾 (Lobster) Token\n")
+    reasoning.append(
+        '- "龙虾" is a token listed on Binance Alpha. '
+        "Multiple tokens named LOBSTER exist; they are not the same. "
+        "Unable to programmatically resolve the exact Binance Alpha listing "
+        "in this baseline runner — a real agent should search for it."
+    )
+    reasoning.append("")
+
+    return reasoning, calls, price_map
 
 
 def _collect_external_intel(price_map):

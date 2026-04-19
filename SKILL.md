@@ -21,9 +21,25 @@ Use this skill when the user asks to:
 
 ## Pre-check: Verify Setup
 
-Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_API_KEY`. If it does, the agent is already paired — skip to Step 3.
+Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_API_KEY`.
 
-If `.env` is missing or does not contain `BENCHMARK_API_KEY`, the agent is not yet paired. Proceed with Step 1.
+**If `.env` is missing or does not contain `BENCHMARK_API_KEY`:** the agent is not yet paired. Proceed with Step 1.
+
+**If `BENCHMARK_API_KEY` exists:** probe the session status immediately by calling:
+
+```bash
+python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task
+```
+
+- If the call **succeeds** (returns a task) → session is active, skip to Step 3.
+- If the call **fails with `code: 1102`** (`Session status "completed" does not allow API access`) → the previous session is finished. Inform the user:
+
+  > The previous session has ended. You need a new pair code to start a new benchmark round.
+  > Please go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in your Bot Name, and copy the new pair code (format: `MANIC-XXXX-XXXX`).
+
+  Then proceed with Step 1 (get new pair code) → Step 2 (bind again) before continuing.
+
+- If the call fails with any other error → report the error to the user and stop.
 
 ## Step 1: Get Pair Code
 

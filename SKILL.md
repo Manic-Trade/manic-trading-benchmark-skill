@@ -23,9 +23,7 @@ Use this skill when the user asks to:
 
 Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_PAIR_CODE`.
 
-**Path A — No pair code yet (`.env` missing or no `BENCHMARK_PAIR_CODE`):**
-
-Do NOT tell the user to run any commands. Instead, directly ask:
+If `.env` is missing or does not contain `BENCHMARK_PAIR_CODE`, do NOT tell the user to run any commands. Directly ask:
 
 > Please provide your pair code (format: `MANIC-XXXX-XXXX`).
 > If you don't have one yet, go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark), log in with Twitter, fill in your Bot Name, and copy the pair code.
@@ -40,9 +38,7 @@ BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
 2. Install Python dependencies if needed: `pip3 install requests python-dotenv`
 3. Immediately proceed to **Bind and Start** below (do NOT ask the user for any extra confirmation — they already expressed intent to run by providing the pair code).
 
-**Path B — Pair code exists, API key exists (`BENCHMARK_API_KEY` is set):**
-
-Probe the session status:
+If `BENCHMARK_PAIR_CODE` exists and `BENCHMARK_API_KEY` is also set, probe the session status:
 
 ```bash
 python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task
@@ -55,9 +51,7 @@ python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task
   - If no → stop.
 - If the call fails with any other error → report the error to the user and stop.
 
-**Path C — Pair code exists, no API key:**
-
-This is either a fresh setup or a previous session was completed. Ask the user:
+If `BENCHMARK_PAIR_CODE` exists but there is no `BENCHMARK_API_KEY`, ask the user:
 
 > Ready to start a benchmark session. Would you like to proceed? [Y/n]
 

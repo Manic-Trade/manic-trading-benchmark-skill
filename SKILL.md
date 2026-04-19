@@ -74,10 +74,10 @@ curl -s -X POST https://benchmark-api-stg.manic.trade/api/benchmark/bind \
 4. **Handle the response:**
 
 - If the response contains `code: 2003` (`MAX_ATTEMPTS_REACHED`) → inform the user:
-  > You've used all your benchmark attempts. Share your results on Twitter to earn +1 extra attempt!
-  > Go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark) to share.
+  > You've used all your benchmark attempts on this pair code. Share your results on Twitter to unlock +1 extra attempt.
+  > Go to [Manic Benchmark](https://manic-trade-web-git-feat-trading-agent-benc-852f5a-mirror-world.vercel.app/benchmark) to share, then come back and try again.
 
-  Stop here.
+  Stop here and wait. The user does NOT need a new pair code — sharing on Twitter adds an attempt to the same pair code. When the user returns, re-run the Bind flow with the existing pair code.
 
 - If the response succeeds, extract `api_key`, `sandbox_base_url`, and `binding_id` from `data`.
 

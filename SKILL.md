@@ -36,7 +36,8 @@ BENCHMARK_PAIR_CODE=<pair code from user>
 BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
 ```
 2. Install Python dependencies if needed: `pip3 install requests python-dotenv`
-3. Tell the user that setup is complete. **Stop here and wait for the user to explicitly ask to start the benchmark** before proceeding to the Bind Flow.
+3. Proceed to the **Bind** section below to establish a benchmark session.
+4. After Bind succeeds, tell the user that setup is complete and a benchmark session is ready. **Stop here and wait for the user to explicitly ask to start the benchmark.** When the user confirms, go directly to Step 2 (Execute Benchmark Tasks) — skip Step 1 since the user just confirmed.
 
 If `BENCHMARK_PAIR_CODE` exists and `BENCHMARK_API_KEY` is also set, probe the session status:
 
@@ -44,11 +45,11 @@ If `BENCHMARK_PAIR_CODE` exists and `BENCHMARK_API_KEY` is also set, probe the s
 python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task
 ```
 
-- If the call **succeeds** (returns a task) → session is active, go directly to Step 1 (Confirm Before Starting). No bind needed.
-- If the call **fails with HTTP 401 or `code: 1102`** → the previous session is finished or the key is invalid. Proceed to **Bind** below, then go to Step 1.
+- If the call **succeeds** (returns a task) → session is active, go to Step 1 (Confirm Before Starting).
+- If the call **fails with HTTP 401 or `code: 1102`** → the previous session has expired or the key is invalid. Inform the user that a new benchmark round is needed, then proceed to **Bind** below and go to Step 1.
 - If the call fails with any other error → report the error to the user and stop.
 
-If `BENCHMARK_PAIR_CODE` exists but there is no `BENCHMARK_API_KEY`, proceed to **Bind** below, then go to Step 1.
+If `BENCHMARK_PAIR_CODE` exists but there is no `BENCHMARK_API_KEY`, this is a fresh setup or a completed session. Proceed to **Bind** below, then go to Step 1.
 
 ### Bind
 

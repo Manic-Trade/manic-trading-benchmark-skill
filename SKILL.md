@@ -36,7 +36,7 @@ BENCHMARK_PAIR_CODE=<pair code from user>
 BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
 ```
 2. Install Python dependencies if needed: `pip3 install requests python-dotenv`
-3. Immediately proceed to **Bind and Start** below (do NOT ask the user for any extra confirmation — they already expressed intent to run by providing the pair code).
+3. Tell the user that setup is complete. **Stop here and wait for the user to explicitly ask to start the benchmark** before proceeding to the Bind Flow.
 
 If `BENCHMARK_PAIR_CODE` exists and `BENCHMARK_API_KEY` is also set, probe the session status:
 
@@ -44,21 +44,13 @@ If `BENCHMARK_PAIR_CODE` exists and `BENCHMARK_API_KEY` is also set, probe the s
 python3 ${SKILL_DIR}/scripts/benchmark_api.py next-task
 ```
 
-- If the call **succeeds** (returns a task) → session is active, skip to Step 1 (Confirm Before Starting).
-- If the call **fails with HTTP 401 or `code: 1102`** → the previous session is finished or the key is invalid. Ask the user:
-  > Your previous benchmark session has ended. Would you like to start a new round? [Y/n]
-  - If yes → proceed to **Bind and Start**.
-  - If no → stop.
+- If the call **succeeds** (returns a task) → session is active, go directly to Step 1 (Confirm Before Starting). No bind needed.
+- If the call **fails with HTTP 401 or `code: 1102`** → the previous session is finished or the key is invalid. Proceed to **Bind** below, then go to Step 1.
 - If the call fails with any other error → report the error to the user and stop.
 
-If `BENCHMARK_PAIR_CODE` exists but there is no `BENCHMARK_API_KEY`, ask the user:
+If `BENCHMARK_PAIR_CODE` exists but there is no `BENCHMARK_API_KEY`, proceed to **Bind** below, then go to Step 1.
 
-> Ready to start a benchmark session. Would you like to proceed? [Y/n]
-
-- If yes → proceed to **Bind and Start**.
-- If no → stop.
-
-### Bind and Start
+### Bind
 
 1. **Determine your base_model:** Introspect your own model to identify the exact model ID you are running on right now. Do NOT ask the user, do NOT guess, do NOT use a generic name. Use your precise model identifier (e.g. `claude-opus-4-6`, `claude-sonnet-4-20250514`, `gpt-4o-2024-08-06`).
 
@@ -98,8 +90,6 @@ BENCHMARK_API_BASE=<sandbox_base_url from response>
 BENCHMARK_SERVER_BASE=https://benchmark-api-stg.manic.trade
 BENCHMARK_SESSION_ID=<binding_id from response>
 ```
-
-6. Continue to Step 1 (Confirm Before Starting).
 
 ## Step 1: Confirm Before Starting
 

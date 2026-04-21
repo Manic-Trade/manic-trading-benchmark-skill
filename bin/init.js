@@ -160,7 +160,7 @@ async function savePairCode() {
     `\n  ${c.dim}Get your pair code from: ${c.cyan}https://benchmark.manic.trade${c.reset}`
   );
   console.log(
-    `  ${c.dim}Login with Twitter → Fill in Bot Name → Copy the pair code${c.reset}\n`
+    `  ${c.dim}Login with Twitter → Fill in Agent Name → Copy the pair code${c.reset}\n`
   );
 
   const pairCode = await ask(

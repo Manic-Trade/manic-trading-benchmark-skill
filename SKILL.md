@@ -26,7 +26,7 @@ Before starting, check if `${SKILL_DIR}/.env` exists and contains `BENCHMARK_PAI
 If `.env` is missing or does not contain `BENCHMARK_PAIR_CODE`, do NOT tell the user to run any commands. Directly ask:
 
 > Please provide your pair code (format: `MANIC-XXXX-XXXX`).
-> If you don't have one yet, go to [Manic Benchmark](https://benchmark.manic.trade), log in with Twitter, fill in your Bot Name, and copy the pair code.
+> If you don't have one yet, go to [Manic Benchmark](https://benchmark.manic.trade), log in with Twitter, fill in your Agent Name, and copy the pair code.
 
 Once the user provides the pair code:
 1. Create `${SKILL_DIR}/.env` with this content:

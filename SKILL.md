@@ -33,7 +33,7 @@ Once the user provides the pair code:
 ```
 # Manic Trading Benchmark Configuration
 BENCHMARK_PAIR_CODE=<pair code from user>
-BENCHMARK_SERVER_BASE=https://bo-server-api-alpha.manic.trade
+BENCHMARK_SERVER_BASE=https://benchmark-api-alpha.manic.trade
 ```
 2. Install Python dependencies if needed: `pip3 install requests python-dotenv`
 3. Proceed to the **Bind** section below to establish a benchmark session.
@@ -60,7 +60,7 @@ If `BENCHMARK_PAIR_CODE` exists but there is no `BENCHMARK_API_KEY`, this is a f
 3. **Call the bind API:**
 
 ```bash
-curl -s -X POST https://bo-server-api-alpha.manic.trade/api/benchmark/bind \
+curl -s -X POST https://benchmark-api-alpha.manic.trade/api/benchmark/bind \
   -H "Content-Type: application/json" \
   -d "{\"pair_code\": \"PAIR_CODE_FROM_ENV\", \"base_model\": \"YOUR_MODEL_ID_HERE\"}"
 ```
@@ -88,7 +88,7 @@ curl -s -X POST https://bo-server-api-alpha.manic.trade/api/benchmark/bind \
 BENCHMARK_PAIR_CODE=<keep existing value>
 BENCHMARK_API_KEY=<api_key from response>
 BENCHMARK_API_BASE=<sandbox_base_url from response>
-BENCHMARK_SERVER_BASE=https://bo-server-api-alpha.manic.trade
+BENCHMARK_SERVER_BASE=https://benchmark-api-alpha.manic.trade
 BENCHMARK_SESSION_ID=<binding_id from response>
 ```
 

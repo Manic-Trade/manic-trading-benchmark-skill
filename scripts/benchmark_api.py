@@ -20,8 +20,8 @@ load_dotenv(_env_path)
 # ─── Configuration ────────────────────────────────────────────────────────────
 
 BENCHMARK_API_KEY = os.getenv("BENCHMARK_API_KEY", "")
-BENCHMARK_API_BASE = os.getenv("BENCHMARK_API_BASE", "https://bo-server-api-alpha.manic.trade/api/agent")
-BENCHMARK_SERVER_BASE = os.getenv("BENCHMARK_SERVER_BASE", "https://bo-server-api-alpha.manic.trade")
+BENCHMARK_API_BASE = os.getenv("BENCHMARK_API_BASE", "https://benchmark-api-alpha.manic.trade/api/agent")
+BENCHMARK_SERVER_BASE = os.getenv("BENCHMARK_SERVER_BASE", "https://benchmark-api-alpha.manic.trade")
 BENCHMARK_SESSION_ID = os.getenv("BENCHMARK_SESSION_ID", "")
 
 TASK_BASE = f"{BENCHMARK_SERVER_BASE}/api/benchmark"

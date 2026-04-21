@@ -7,7 +7,7 @@ const fs = require("fs");
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BENCHMARK_SERVER_BASE = "https://bo-server-api-alpha.manic.trade";
+const BENCHMARK_SERVER_BASE = "https://benchmark-api-alpha.manic.trade";
 const MIN_PYTHON_VERSION = [3, 9];
 
 // ─── Colors ──────────────────────────────────────────────────────────────────

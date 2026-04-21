@@ -105,6 +105,9 @@ def get_next_task():
     return _request("POST", f"{TASK_BASE}/task/next")
 
 
+MAX_PAYLOAD_BYTES = 900_000  # stay under 1MB server limit
+
+
 def submit_task(task_index, status, agent_reasoning,
                 api_calls=None, external_api_calls=None, duration_ms=None, context=None):
     """POST /benchmark/task/submit — Submit task result."""
@@ -121,6 +124,15 @@ def submit_task(task_index, status, agent_reasoning,
         body["duration_ms"] = duration_ms
     if context is not None:
         body["context"] = context
+
+    payload_size = len(json.dumps(body, default=str).encode("utf-8"))
+    if payload_size > MAX_PAYLOAD_BYTES:
+        raise ApiError(
+            code=-2,
+            msg=f"Payload too large: {payload_size} bytes exceeds {MAX_PAYLOAD_BYTES} byte limit. "
+                f"Reduce agent_reasoning, api_calls, or external_api_calls size.",
+        )
+
     return _request("POST", f"{TASK_BASE}/task/submit", json_body=body)
 
 

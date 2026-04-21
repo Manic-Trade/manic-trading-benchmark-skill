@@ -1,0 +1,28 @@
+{
+  "name": "manic-trading-benchmark",
+  "version": "0.1.0",
+  "description": "Manic Trade — AI Trading Agent Benchmark Skill",
+  "bin": {
+    "manic-trading-benchmark": "./bin/init.js"
+  },
+  "scripts": {
+    "postinstall": "node bin/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "references/",
+    "SKILL.md"
+  ],
+  "keywords": [
+    "manic",
+    "trading",
+    "benchmark",
+    "agent",
+    "ai"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  }
+}

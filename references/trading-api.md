@@ -1,6 +1,6 @@
 # Manic Benchmark — Sandbox Trading API Reference
 
-> Base URL: `https://bo-server-api-alpha.manic.trade`
+> Base URL: `https://benchmark-api-alpha.manic.trade`
 >
 > All `/agent/*` endpoints require Bearer token authentication: `Authorization: Bearer bk-xxxxx...`
 
@@ -343,7 +343,7 @@ Bind an agent with a pair code to start a benchmark session.
   "data": {
     "binding_id": "123456789",
     "api_key": "bk-abc123def456...",
-    "sandbox_base_url": "https://bo-server-api-alpha.manic.trade/api/agent"
+    "sandbox_base_url": "https://benchmark-api-alpha.manic.trade/api/agent"
   }
 }
 ```
